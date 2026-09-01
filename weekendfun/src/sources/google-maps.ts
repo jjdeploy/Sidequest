@@ -27,7 +27,7 @@
 import type { Page } from "patchright-core"
 import type { Candidate } from "../types.js"
 import type { SourceContext, SourceTask } from "../solari/pool.js"
-import { buildCandidate, categoryFromMapsType, guessCategory } from "./util.js"
+import { buildCandidate, categoryFromMapsType, guessCategory, MAPS_TYPE_PATTERN } from "./util.js"
 
 /** How many places to take from one search. The rail holds far more, but the
  *  top of a Maps result list is where the relevance is, and a wider net costs
@@ -67,8 +67,8 @@ async function searchOne(page: Page, term: string, lat: number, lng: number) {
   // `evaluateAll` on a missing selector returns [], which is the right answer
   // for "nothing matched" — no waiting required to establish that.
   return page.locator('a[href*="/maps/place/"]').evaluateAll(
-    (els, limit) =>
-      els.slice(0, limit).map((el) => {
+    (els, [limit, typePattern]: [number, string]) =>
+      els.slice(0, limit as number).map((el) => {
         const a = el as HTMLAnchorElement
         // The card is the anchor's parent block; ratings and price live as
         // siblings, not children, so walk up before reading.
@@ -88,7 +88,7 @@ async function searchOne(page: Page, term: string, lat: number, lng: number) {
         // guessing a category from the name, because Maps actually says
         // "Bowling alley" and "Nature preserve".
         const addrMatch = text.match(/·\s*·?\s*(\d{1,6}\s+[A-Z][^·]{4,50}?)(?=[A-Z][a-z]{3,}|$)/)
-        const typeMatch = text.match(/\d\.\d([A-Z][a-z]+(?:\s[a-z]+)*)\s*·/)
+        const typeMatch = text.match(new RegExp(typePattern))
 
         return {
           title: label,
@@ -105,7 +105,7 @@ async function searchOne(page: Page, term: string, lat: number, lng: number) {
           priceText: (text.match(/\$\d[\d–\-—\s.$]*|\$+(?=\s|$)/) ?? [""])[0],
         }
       }),
-    PER_SEARCH,
+    [PER_SEARCH, MAPS_TYPE_PATTERN] as [number, string],
   )
 }
 
@@ -152,12 +152,15 @@ export const googleMaps: SourceTask = {
               title: r.title,
               url: r.href,
               // Maps' own descriptor first — "Live music venue" is a fact,
-              // where inferring from the name is a guess. Falls through to
-              // the name, and then to the keyword's own category, which is
-              // both more accurate than guessing and traceable back to why
-              // we searched at all.
-              category:
-                categoryFromMapsType(r.mapsType) ?? guessCategory(r.title, kw.category),
+              // where inferring from the name is a guess. Then the name.
+              //
+              // It does NOT fall through to the keyword's category. That says
+              // what we SEARCHED for, not what we found, and Maps returns
+              // tangential results constantly: a search for "bowling" turned
+              // up a custom t-shirt shop, which was duly filed under "active"
+              // and took a slot in the plan. "other" is the honest answer when
+              // neither the descriptor nor the name says anything.
+              category: categoryFromMapsType(r.mapsType) ?? guessCategory(r.title, "other"),
               evidence: r.text || r.title,
               priceRaw: r.priceText,
               ratingRaw: r.ratingLabel,

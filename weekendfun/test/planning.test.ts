@@ -6,10 +6,11 @@
  */
 import { test, describe } from "node:test"
 import assert from "node:assert/strict"
-import { buildKeywords } from "../src/engine/keywords.js"
+import { buildKeywords, requestedCategories } from "../src/engine/keywords.js"
 import { buildItinerary } from "../src/engine/itinerary.js"
 import { rank } from "../src/engine/score.js"
 import { candidate, request, scored, WEEKEND } from "./helpers.js"
+import type { Category } from "../src/types.js"
 
 const terms = (req: Parameters<typeof buildKeywords>[0]) => buildKeywords(req, 8).map((k) => k.term)
 
@@ -85,6 +86,7 @@ describe("rank: merging sightings of one venue", () => {
     history: new Map(),
     weights: {},
     relevance: new Map(),
+    requested: new Set<Category>(),
   }
 
   test("the rating comes from whichever source counted more reviews", () => {
@@ -199,5 +201,67 @@ describe("buildItinerary: it is a schedule, not a ranked list", () => {
   test("days come back in the order the user thinks about them", () => {
     const it = buildItinerary(many(12, "food"), req, [])
     assert.deepEqual(it.days.map((d) => d.date), WEEKEND)
+  })
+})
+
+describe("what you asked for reaches the ranking, not just the search", () => {
+  test("requestedCategories separates stated intent from the floor", () => {
+    // The floor sits at 0.45-0.55 and exists to stop an empty request
+    // producing an empty sweep. It is not something anyone asked for, so it
+    // must not earn the ranking bonus.
+    const asked = requestedCategories(buildKeywords(request({ vibes: ["bowling"] }), 8))
+    assert.ok(asked.has("active"), "bowling is an 'active' request")
+
+    const floorOnly = requestedCategories(buildKeywords(request(), 8))
+    assert.equal(floorOnly.size, 0, "an empty request asks for nothing in particular")
+  })
+
+  test("an asked-for category scores above an identical one nobody mentioned", () => {
+    const base = {
+      req: request(), weather: [], corroboration: new Map(),
+      history: new Map(), weights: {}, relevance: new Map(),
+    }
+    const lanes = candidate({ id: "lanes", category: "active", rating: 4.0 })
+    const [asked] = rank([lanes], { ...base, requested: new Set<Category>(["active"]) })
+    const [unasked] = rank([lanes], { ...base, requested: new Set<Category>() })
+    assert.ok(asked!.score > unasked!.score)
+    assert.ok(asked!.components.some((c) => c.name === "you asked for this"))
+  })
+
+  test("ask for bowling and there is bowling in the weekend", () => {
+    // The bug this exists for: "Palm Coast Lanes" is 4.0 with no review
+    // count, so on generic quality it loses to a 4.7-from-268-reviews park
+    // every time — and should, unless somebody asked for bowling. A score
+    // nudge alone can't close that gap; the itinerary reserves one slot.
+    const lanes = scored(candidate({ id: "lanes", title: "Palm Coast Lanes", category: "active" }), 5)
+    const parks = Array.from({ length: 12 }, (_, i) =>
+      scored(candidate({ id: `park-${i}`, category: "outdoors", rating: 4.8, reviewCount: 4000 }), 90 - i),
+    )
+
+    const without = buildItinerary([lanes, ...parks], request(), [])
+    assert.equal(
+      without.days.flatMap((d) => d.items).some((i) => i.scored.candidate.id === "lanes"),
+      false,
+      "unrequested, it should lose on merit",
+    )
+
+    const withAsk = buildItinerary([lanes, ...parks], request(), [], new Set(["active"]))
+    assert.equal(
+      withAsk.days.flatMap((d) => d.items).some((i) => i.scored.candidate.id === "lanes"),
+      true,
+      "requested, it has to appear",
+    )
+  })
+
+  test("but only one slot — asking for bowling doesn't fill the weekend with it", () => {
+    const lanes = Array.from({ length: 6 }, (_, i) =>
+      scored(candidate({ id: `lanes-${i}`, category: "active" }), 5),
+    )
+    const parks = Array.from({ length: 12 }, (_, i) =>
+      scored(candidate({ id: `park-${i}`, category: "outdoors", rating: 4.8, reviewCount: 4000 }), 90 - i),
+    )
+    const it = buildItinerary([...lanes, ...parks], request(), [], new Set(["active"]))
+    const active = it.days.flatMap((d) => d.items).filter((i) => i.scored.candidate.category === "active")
+    assert.equal(active.length, 1, `got ${active.length} active slots`)
   })
 })

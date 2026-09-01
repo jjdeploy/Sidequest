@@ -93,6 +93,28 @@ const FLOOR: Array<[string, Category, string]> = [
  *  from the floor. Eight is the Maps shard cap. */
 const MIN_TERMS = 5
 
+/**
+ * Weight above which a term came from the request rather than the floor.
+ *
+ * Vibes are 0.85, party 0.9, budget 0.8; the floor is 0.45–0.55 and the
+ * mobility nudge is 0.7. Everything at or above this was asked for, one way
+ * or another, which is what downstream needs to know.
+ */
+const ASKED_FOR = 0.75
+
+/**
+ * The categories the user actually asked about.
+ *
+ * Search intent has to reach ranking, not just querying. Typing "bowling"
+ * found Palm Coast Lanes and then ranked it below a park nobody mentioned,
+ * because the scorer only ever saw generic quality — a 4.0 with no review
+ * count loses to a 4.7 from 268 reviews every time, and should, unless
+ * somebody asked for bowling.
+ */
+export function requestedCategories(keywords: Keyword[]): Set<Category> {
+  return new Set(keywords.filter((k) => k.weight >= ASKED_FOR).map((k) => k.category))
+}
+
 function normalizeVibe(v: string): string[] {
   const s = v.toLowerCase().trim()
   const hits: string[] = []

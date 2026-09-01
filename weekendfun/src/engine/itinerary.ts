@@ -80,7 +80,22 @@ export function buildItinerary(
   ranked: Scored[],
   req: PlanRequest,
   weather: Weather[],
+  /** Categories the request asked about — see engine/keywords.ts. */
+  requested: Set<string> = new Set(),
 ): Itinerary {
+  /**
+   * Categories asked for that haven't made the plan yet.
+   *
+   * If someone types "bowling", there should be bowling in their weekend.
+   * A score bonus alone can't promise that: an explicitly requested venue is
+   * often a thin one — Palm Coast Lanes is 4.0 with no review count — and it
+   * will lose to a well-reviewed park that nobody mentioned however much you
+   * nudge it. So the FIRST candidate of each requested category gets a large
+   * one-time preference, and the category drops out as soon as it's placed.
+   * One guaranteed slot each, not six.
+   */
+  const owed = new Set(requested)
+
   const byDate = new Map(weather.map((w) => [w.date, w]))
   const notes: string[] = []
   const used = new Set<string>()
@@ -158,6 +173,10 @@ export function buildItinerary(
         // fan-out rather than whichever source happens to score highest.
         fit -= (sourceUse.get(c.source) ?? 0) * 9
 
+        // The one-time guarantee. Big enough to clear the gap between a
+        // requested-but-thin venue and an unrequested-but-excellent one.
+        if (owed.has(c.category)) fit += 60
+
         // Keep the outdoor things off the wet day where we can.
         const outdoor = c.indoor === false || (c.indoor === null && (c.category === "outdoors" || c.category === "active"))
         if (washout && outdoor) fit -= 25
@@ -171,6 +190,7 @@ export function buildItinerary(
       }
 
       used.add(best.s.candidate.id)
+      owed.delete(best.s.candidate.category)
       sourceUse.set(best.s.candidate.source, (sourceUse.get(best.s.candidate.source) ?? 0) + 1)
       const cost = (best.s.candidate.priceUsd ?? 0) * heads
       remainingBudget -= cost

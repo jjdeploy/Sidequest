@@ -17,6 +17,7 @@ import {
   parseRating,
   parseReviewCount,
 } from "../src/sources/util.js"
+import { MAPS_TYPE_PATTERN } from "../src/sources/util.js"
 import { cleanField, decodeEntities, isDegenerate } from "../src/sources/text.js"
 
 describe("guessCategory: unanchored tokens hide inside longer words", () => {
@@ -187,3 +188,37 @@ describe("milesBetween", () => {
 })
 
 const TAMPA_PT = { lat: 27.94752, lng: -82.45843 }
+
+describe("MAPS_TYPE_PATTERN: digging the descriptor out of a result card", () => {
+  // Verbatim card text. The descriptor is the single most valuable field Maps
+  // gives us — it is the difference between "Bowling alley" and guessing — so
+  // the regex that extracts it gets tested rather than living unreachable
+  // inside a browser callback.
+  const typeOf = (card: string) => card.match(new RegExp(MAPS_TYPE_PATTERN))?.[1]?.trim() ?? null
+
+  test("plain two-word descriptor", () => {
+    assert.equal(typeOf("Palm Coast LanesPalm Coast Lanes 4.0Bowling alley ·  · 11 Old Kings Rd"), "Bowling alley")
+  })
+
+  test("hyphenated descriptors are not lost", () => {
+    // This is the bug: the separator only allowed spaces, so "Custom t-shirt
+    // store" matched nothing, the descriptor was dropped, and the candidate
+    // got categorised by the search term that happened to find it.
+    assert.equal(
+      typeOf("Big Frog Custom T-Shirts & MoreBig Frog Custom T-Shirts & More 4.9Custom t-shirt store ·  · 250"),
+      "Custom t-shirt store",
+    )
+    assert.equal(typeOf("Speedway KartsSpeedway Karts 4.3Go-kart track ·  · 9 Main St"), "Go-kart track")
+    assert.equal(typeOf("The MotorVuThe MotorVu 4.1Drive-in movie theater ·  · 1 Rd"), "Drive-in movie theater")
+  })
+
+  test("single-word descriptor", () => {
+    assert.equal(typeOf("Varn ParkVarn Park 4.7Park ·  · 3665 N Oceanshore Blvd"), "Park")
+  })
+
+  test("and the descriptors it finds still map to the right category", () => {
+    assert.equal(categoryFromMapsType("Custom t-shirt store"), "shopping")
+    assert.equal(categoryFromMapsType("Go-kart track"), "active")
+    assert.equal(categoryFromMapsType("Bowling alley"), "active")
+  })
+})

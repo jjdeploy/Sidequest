@@ -17,7 +17,7 @@
  */
 import { randomUUID } from "node:crypto"
 import { buildItinerary, type Itinerary } from "./engine/itinerary.js"
-import { buildKeywords, type Keyword } from "./engine/keywords.js"
+import { buildKeywords, requestedCategories, type Keyword } from "./engine/keywords.js"
 import { describeTaste } from "./engine/learn.js"
 import { makeLocalityResolver } from "./engine/localities.js"
 import { screen, type ScreenSummary, type Verdict } from "./engine/relevance.js"
@@ -413,6 +413,7 @@ export async function runPlan(
     history: store.historyFor([...new Set(admitted.map((c) => c.id))]),
     weights,
     relevance: verdicts,
+    requested: requestedCategories(keywords),
   }
   const ranked = rank(admitted, ctx)
   // Everything, not a top slice. The page shows the plan and then every
@@ -421,7 +422,7 @@ export async function runPlan(
   emit({ type: "ranked", top: ranked.map(toView) })
 
   // 5. Assemble.
-  const itinerary = buildItinerary(ranked, req, weather)
+  const itinerary = buildItinerary(ranked, req, weather, ctx.requested)
   const planId = randomUUID()
   store.savePlan(planId, runId, `${req.place.label} ${req.days[0]}`, itinerary.days)
   emit({ type: "itinerary", planId, runId, itinerary: itineraryView(itinerary, req.budgetUsd) })

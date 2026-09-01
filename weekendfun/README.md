@@ -206,6 +206,30 @@ That fallback is why a town with three bowling alleys now returns them. The old
 one was two event phrases, so Palm Coast Lanes was never a near miss — it was
 never queried.
 
+### Intent has to reach the ranking, not just the search
+
+Typing "bowling" found Palm Coast Lanes and then left it out of the plan.
+Every part was individually right: the keyword builder searched bowling, Maps
+found the alley, the gate admitted it — and the scorer had never heard of the
+request. On generic quality a 4.0 with no review count loses to a
+4.7-from-268-reviews park every time, and should, unless somebody asked for
+bowling.
+
+Two things fix it, and they're deliberately different sizes. Ranking gets a
+modest `+12 you asked for this`, which reorders the catalogue. The itinerary
+reserves **one** slot per requested category, because an explicitly requested
+venue is often a thin one and no score nudge closes a thirty-point gap. One
+slot each, not six — ask for bowling and there's bowling in your weekend, not
+a weekend of bowling.
+
+The first attempt put a custom t-shirt shop in that slot. Maps had labelled it
+`Custom t-shirt store`, but the descriptor regex only allowed spaces between
+words, so the hyphen dropped the whole match — and the category then fell back
+to *the term we searched for*. Which is how a search for "bowling" filed a
+print shop under "active". The pattern allows hyphens now and lives in
+`util.ts` where it can be tested, and the fallback is `other`: the keyword says
+what we looked for, never what we found.
+
 **An invariant, written into `keywords.ts` because it's the kind of thing a
 later change breaks by accident:** the learned taste vector must never reach
 the keyword builder. Weights scale scores; intent chooses queries; the two

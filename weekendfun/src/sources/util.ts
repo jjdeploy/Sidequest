@@ -180,6 +180,23 @@ export function isJunkEvent(title: string, evidence = ""): boolean {
  * small closed vocabulary that Maps controls, so map them directly and fall
  * back to the name when it's something unlisted.
  */
+/**
+ * How Google Maps' own type descriptor is dug out of a result card.
+ *
+ * A string rather than a RegExp because it has to cross into the page via
+ * `evaluateAll` — and keeping it here means the fragile part is testable
+ * instead of buried in a browser callback nobody can reach.
+ *
+ * Card text runs together as:
+ *   "<name><name> 4.6Tourist attraction ·  · 401 W Kennedy BlvdHome to..."
+ *
+ * The separator inside the descriptor has to allow hyphens. Without that,
+ * "4.9Custom t-shirt store ·" matched nothing at all, the descriptor was
+ * lost, and a t-shirt shop got categorised by the search term that found it.
+ * Same for "Go-kart track", "Drive-in theater", "Bed-and-breakfast".
+ */
+export const MAPS_TYPE_PATTERN = "\\d\\.\\d([A-Z][a-z]+(?:[\\s-][a-z]+)*)\\s*·"
+
 export function categoryFromMapsType(raw: string): Category | null {
   const s = raw.toLowerCase().trim()
   if (!s) return null

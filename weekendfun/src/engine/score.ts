@@ -10,7 +10,7 @@
  * keeps a cold-start run sensible: with no history, every learned weight is
  * 1.0 and this degrades to a decent generic ranker rather than to noise.
  */
-import type { Candidate, PlanRequest, Weather } from "../types.js"
+import type { Candidate, Category, PlanRequest, Weather } from "../types.js"
 import { milesBetween } from "../sources/util.js"
 import type { Verdict } from "./relevance.js"
 import { isWashout } from "../sources/weather.js"
@@ -40,6 +40,8 @@ export interface ScoreContext {
   weights: Record<string, number>
   /** candidateId -> admission verdict, from engine/relevance.ts. */
   relevance: Map<string, Verdict>
+  /** Categories the request actually asked about, from requestedCategories. */
+  requested: Set<Category>
 }
 
 /** Categories that mostly happen outside, for the weather penalty. `indoor`
@@ -94,6 +96,15 @@ export function scoreCandidate(c: Candidate, ctx: ScoreContext): Scored {
   // weekend plan should lean on that.
   if ((c.reviewCount ?? 0) > 50) {
     add("well known", Math.log10(c.reviewCount!) * 2, `${c.reviewCount!.toLocaleString()} people have reviewed it`)
+  }
+
+  // ── What was actually asked for ──────────────────────────────────────────
+  // Modest on purpose. This nudges the catalogue's ordering so the things you
+  // asked about surface first; making sure at least one of them reaches the
+  // plan is the itinerary's job, because that is a question about the shape
+  // of a weekend rather than about how good a venue is.
+  if (ctx.requested.has(c.category)) {
+    add("you asked for this", 12, `you asked for something in "${c.category}"`)
   }
 
   // ── Timeliness ───────────────────────────────────────────────────────────
