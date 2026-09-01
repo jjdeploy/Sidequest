@@ -265,3 +265,40 @@ describe("what you asked for reaches the ranking, not just the search", () => {
     assert.equal(active.length, 1, `got ${active.length} active slots`)
   })
 })
+
+describe("saying WHEN you want it", () => {
+  const lanes = () => scored(candidate({ id: "lanes", title: "Palm Coast Lanes", category: "active" }), 5)
+  // Scores in the range real ones land in: a strong venue scores around 30-45
+  // (corroboration 14 + rating 8 + well-known 7), not 90. A fixture that
+  // scores 90 makes the reservation look broken when it isn't.
+  const filler = () =>
+    Array.from({ length: 14 }, (_, i) =>
+      scored(candidate({ id: `p-${i}`, category: i % 2 ? "outdoors" : "food", rating: 4.8, reviewCount: 4000 }), 38 - i),
+    )
+  const slotOf = (it: ReturnType<typeof buildItinerary>, id: string) =>
+    it.days.flatMap((d) => d.items).find((i) => i.scored.candidate.id === id)?.slot ?? null
+
+  test('with no stated time it takes the first slot it can', () => {
+    const it = buildItinerary([lanes(), ...filler()], request(), [], new Set(["active"]))
+    assert.equal(slotOf(it, "lanes"), "Morning")
+  })
+
+  test('"bowling at night" puts bowling at night', () => {
+    // The reservation used to fire in whatever slot came first, so an evening
+    // request came back as ten in the morning. A consolation bonus in the
+    // other slots didn't fix it either — combined with the ranking bonus it
+    // still beat a 4.8-star park.
+    const it = buildItinerary([lanes(), ...filler()], request({ timeOfDay: "evening" }), [], new Set(["active"]), "evening")
+    assert.equal(slotOf(it, "lanes"), "Evening")
+  })
+
+  test("morning means morning", () => {
+    const it = buildItinerary([lanes(), ...filler()], request({ timeOfDay: "morning" }), [], new Set(["active"]), "morning")
+    assert.equal(slotOf(it, "lanes"), "Morning")
+  })
+
+  test("afternoon means afternoon", () => {
+    const it = buildItinerary([lanes(), ...filler()], request({ timeOfDay: "afternoon" }), [], new Set(["active"]), "afternoon")
+    assert.equal(slotOf(it, "lanes"), "Afternoon")
+  })
+})

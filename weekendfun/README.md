@@ -230,6 +230,30 @@ print shop under "active". The pattern allows hyphens now and lives in
 `util.ts` where it can be tested, and the fallback is `other`: the keyword says
 what we looked for, never what we found.
 
+### And when you said you wanted it
+
+"bowling at night" came back with no bowling at all, for two reasons that had
+nothing to do with each other.
+
+The intake prompt's examples were all mood words — `"chill"`, `"outdoorsy"`,
+`"date night"` — so the model helpfully generalised the request into
+`["night out"]` and threw the actual noun away. Then nothing matched: the vibe
+vocabulary only recognised the literal string "nightlife", so "night out"
+matched no key at all, the floor took over, and the request asked for nothing
+in particular. The prompt now says to keep concrete activities as themselves,
+and "night", "evening" and "after dark" all reach nightlife.
+
+There was also no concept of *when*. `timeOfDay` is a field now, and the
+reserved slot waits for it — the whole bonus in the hour you asked for and
+nothing anywhere else. A consolation bonus in the other slots doesn't work:
+combined with the ranking bonus it still beat a 4.8-star park, and the answer
+came back as bowling at ten in the morning a second time.
+
+```
+Read your request as: bowling · in the evening · $300 · car
+  Evening    Palm Coast Lanes
+```
+
 **An invariant, written into `keywords.ts` because it's the kind of thing a
 later change breaks by accident:** the learned taste vector must never reach
 the keyword builder. Weights scale scores; intent chooses queries; the two

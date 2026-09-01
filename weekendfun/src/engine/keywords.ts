@@ -125,7 +125,10 @@ function normalizeVibe(v: string): string[] {
   if (/date|romantic|anniversary/.test(s)) hits.push("romantic")
   if (/kid|child|family|toddler/.test(s)) hits.push("family")
   if (/budget|broke|free|cheap/.test(s)) hits.push("cheap")
-  if (/party|bar|club|drink/.test(s)) hits.push("nightlife")
+  // "a night out" and "after dark" contain none of the vocabulary's own keys,
+  // so nothing matched at all and the floor took over — which is how
+  // "bowling at night" ended up asking for nothing in particular.
+  if (/party|bar|club|drink|night|evening|after dark/.test(s)) hits.push("nightlife")
   if (/art|museum|history|culture/.test(s)) hits.push("cultural")
   if (/hike|outside|outdoor|nature|beach/.test(s)) hits.push("outdoorsy")
   if (/eat|food|restaurant|dinner|brunch/.test(s)) hits.push("foodie")

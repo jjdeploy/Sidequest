@@ -78,6 +78,7 @@ export interface RequestDraft {
   vibes?: string[]
   mobility?: Mobility
   avoid?: string[]
+  timeOfDay?: PlanRequest["timeOfDay"]
   /** Free text, parsed by Claude when it's available. Layers on top of the
    *  explicit fields rather than replacing them. */
   ask?: string
@@ -103,6 +104,7 @@ export async function resolvePlanRequest(where: string, draft: RequestDraft): Pr
     vibes: draft.vibes?.filter(Boolean) ?? [],
     mobility: draft.mobility ?? "car",
     avoid: draft.avoid?.filter(Boolean) ?? [],
+    timeOfDay: draft.timeOfDay,
   }
 
   let askNote: string | null = null
@@ -116,7 +118,13 @@ export async function resolvePlanRequest(where: string, draft: RequestDraft): Pr
       if (parsed.kidAges?.length) req.party.kidAges = parsed.kidAges
       if (parsed.mobility) req.mobility = parsed.mobility
       if (parsed.avoid?.length) req.avoid = [...req.avoid, ...parsed.avoid]
-      askNote = `${req.vibes.join(", ")} · $${req.budgetUsd} · ${req.mobility}`
+      if (parsed.timeOfDay) req.timeOfDay = parsed.timeOfDay
+      askNote = [
+        req.vibes.join(", "),
+        req.timeOfDay && `in the ${req.timeOfDay}`,
+        `${req.budgetUsd}`,
+        req.mobility,
+      ].filter(Boolean).join(" · ")
     } else {
       askNote = "couldn't parse — using the form values"
     }
@@ -422,7 +430,7 @@ export async function runPlan(
   emit({ type: "ranked", top: ranked.map(toView) })
 
   // 5. Assemble.
-  const itinerary = buildItinerary(ranked, req, weather, ctx.requested)
+  const itinerary = buildItinerary(ranked, req, weather, ctx.requested, req.timeOfDay)
   const planId = randomUUID()
   store.savePlan(planId, runId, `${req.place.label} ${req.days[0]}`, itinerary.days)
   emit({ type: "itinerary", planId, runId, itinerary: itineraryView(itinerary, req.budgetUsd) })

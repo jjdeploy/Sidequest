@@ -73,6 +73,9 @@ export interface PlanRequest {
   mobility: Mobility
   /** Categories or keywords to exclude outright. */
   avoid: string[]
+  /** When they said they wanted it. "bowling at night" is two requests, and
+   *  dropping half of it is how bowling ended up scheduled for 10am. */
+  timeOfDay?: "morning" | "afternoon" | "evening"
 }
 
 /** A time window a candidate is available in, in local wall-clock time. */

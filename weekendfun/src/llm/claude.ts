@@ -109,6 +109,7 @@ function extractJson<T>(text: string): T | null {
 
 export interface ParsedIntake {
   vibes?: string[]
+  timeOfDay?: "morning" | "afternoon" | "evening"
   budgetUsd?: number
   adults?: number
   kids?: number
@@ -132,13 +133,17 @@ Request: ${JSON.stringify(text)}
 
 Schema (omit any field the request does not mention — do not guess):
 {
-  "vibes": string[],        // short tags, e.g. ["chill","outdoorsy","date night"]
+  "vibes": string[],        // short tags. KEEP CONCRETE ACTIVITIES AS THEMSELVES:
+                            // "bowling at night" -> ["bowling"], not ["night out"].
+                            // Generalise only when the request is itself vague:
+                            // ["chill"], ["outdoorsy"], ["date night"]
   "budgetUsd": number,      // total for the whole party, all days
   "adults": number,
   "kids": number,
   "kidAges": number[],
   "mobility": "walk" | "transit" | "car",
-  "avoid": string[]         // things they explicitly do not want
+  "avoid": string[],        // things they explicitly do not want
+  "timeOfDay": "morning" | "afternoon" | "evening"   // only if they say when
 }`
 
   try {

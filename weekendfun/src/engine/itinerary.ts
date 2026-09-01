@@ -82,6 +82,8 @@ export function buildItinerary(
   weather: Weather[],
   /** Categories the request asked about — see engine/keywords.ts. */
   requested: Set<string> = new Set(),
+  /** When they asked for it, if they said. */
+  timeOfDay?: PlanRequest["timeOfDay"],
 ): Itinerary {
   /**
    * Categories asked for that haven't made the plan yet.
@@ -175,7 +177,18 @@ export function buildItinerary(
 
         // The one-time guarantee. Big enough to clear the gap between a
         // requested-but-thin venue and an unrequested-but-excellent one.
-        if (owed.has(c.category)) fit += 60
+        //
+        // If they said WHEN, hold the whole bonus for that slot and give
+        // nothing anywhere else. A consolation bonus does not work here: the
+        // first attempt handed out +20 in the other slots, which combined
+        // with the ranking bonus still beat a 4.8-star park, and "bowling at
+        // night" came back as bowling at ten in the morning again. Slots are
+        // visited in order, so waiting costs nothing — the reservation fires
+        // when the right hour comes round.
+        if (owed.has(c.category)) {
+          const rightTime = !timeOfDay || timeOfDay.toLowerCase() === slot.label.toLowerCase()
+          if (rightTime) fit += 60
+        }
 
         // Keep the outdoor things off the wet day where we can.
         const outdoor = c.indoor === false || (c.indoor === null && (c.category === "outdoors" || c.category === "active"))
