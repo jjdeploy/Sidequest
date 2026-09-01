@@ -239,7 +239,7 @@ async function cmdPlan(args: Args): Promise<void> {
     maxConcurrent: num(args, "concurrency", 12),
     recording: bool(args, "record"),
     retries: num(args, "retries", 1),
-    sourceTimeoutMs: num(args, "source-timeout", 75) * 1000,
+    sourceTimeoutMs: num(args, "source-timeout", 90) * 1000,
     onEvent: renderProgress,
   })
 

@@ -95,6 +95,36 @@ Reddit blocks all logged-out automation. Measured: 403 across residential proxy,
 
 This uses the token. Automating a logged-in personal account would violate their ToS and risk the account, which is a bad trade for a public repo. Add `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` ([create a `script` app](https://www.reddit.com/prefs/apps)) and it turns on. Without them the source skips itself and everything else runs.
 
+## It works outside the city it was written in
+
+Every scraper here was written against Tampa, and a scraper that works in
+exactly one city is a demo. `npm run harden` runs the real fan-out across a
+spread of places and prints a yield matrix:
+
+```
+city                google-maps   eventbrite    allevents     groupon       tripadvisor   timeout
+Austin, TX          38            9             15            15            14            40
+Boise, ID           37            10            15            18            12            25
+Seattle, WA         38            9             15            28            12            30
+Asheville, NC       38            9             15            9             12            31
+
+No source failed outright.
+```
+
+It runs with `retries: 0` on purpose — retries hide flakiness, and the point is
+to see it. Two real problems surfaced this way and neither was visible in Tampa:
+
+- **TripAdvisor blew its watchdog in about half of runs**, but finished in 11-14s
+  when run alone. The work hadn't got slower; six browsers launching at once had.
+  Launches are now staggered a few hundred milliseconds apart.
+- **One flaky source was setting the wall clock for the whole plan.** The fan-out
+  is parallel, so it finishes with the slowest source — a failing TripAdvisor on
+  the default 90s budget turned a 20s Boise plan into 98s. Sources can now
+  declare their own budget, and TripAdvisor gets 45s: it is the most
+  contention-sensitive and the least essential, so it should fail fast.
+
+Boise went from 5/6 sources in 98s to 6/6 in 20s.
+
 ## Ranking is deterministic and shows its working
 
 No model decides what goes in your weekend. Every score is named components you can read:
@@ -143,7 +173,9 @@ npm run plan -- "Tampa, FL" --explain --record
 npm run feedback -- <candidate-id> <kept|skipped|did|rated> [1-5]
 npm run history
 npm run sources
-npm run geo-proof
+npm run geo-proof                     prove the location targeting works
+npm run harden                        run every source against several cities
+npm run harden -- "Boise, ID"         ...or ones you choose
 ```
 
 Flags: `--vibes --budget --adults --kids --mobility --avoid --days --sources --concurrency --retries --explain --record --no-writeup`

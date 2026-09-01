@@ -10,7 +10,8 @@
     "geo-proof": "tsx src/geo-proof.ts",
     "feedback": "tsx src/cli.ts feedback",
     "history": "tsx src/cli.ts history",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "harden": "tsx src/harden.ts"
   },
   "dependencies": {
     "@solarisdk/browser": "^0.1.1",

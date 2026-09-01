@@ -42,6 +42,16 @@ export interface SourceTask {
   /** Managed captcha solving. Costs time, so it's opt-in per source rather
    *  than blanket-on. Requires stealth, which the pool always sets. */
   captcha?: boolean
+  /**
+   * Override the pool's watchdog for this source.
+   *
+   * Worth setting wherever a source's healthy time is well known: the fan-out
+   * runs in parallel, so its wall clock is the SLOWEST source, and one flaky
+   * source sitting on the default budget doubles how long the user waits for a
+   * plan that was otherwise ready. A source that normally finishes in 13s does
+   * not need 90 seconds to prove it has failed.
+   */
+  timeoutMs?: number
 }
 
 export type PoolEvent =
@@ -64,6 +74,8 @@ export interface PoolOptions {
    *  redirect) holds a session and blocks the run past any useful deadline.
    *  A weekend planner that takes ten minutes has already failed. */
   sourceTimeoutMs?: number
+  /** Gap between successive source launches, to avoid a thundering herd. */
+  staggerMs?: number
   onEvent?: (e: PoolEvent) => void
 }
 
@@ -99,6 +111,7 @@ export class BrowserPool {
   private readonly recording: boolean
   private readonly retries: number
   private readonly sourceTimeoutMs: number
+  private readonly staggerMs: number
   private readonly onEvent?: (e: PoolEvent) => void
   /**
    * Run id, combined with the source name to make a PER-SOURCE sticky IP.
@@ -122,6 +135,7 @@ export class BrowserPool {
     this.recording = opts.recording ?? false
     this.retries = opts.retries ?? 1
     this.sourceTimeoutMs = opts.sourceTimeoutMs ?? 90_000
+    this.staggerMs = opts.staggerMs ?? 400
     this.onEvent = opts.onEvent
   }
 
@@ -143,14 +157,27 @@ export class BrowserPool {
     this.waiting.shift()?.()
   }
 
-  /** Run every source in parallel. Always resolves, one result per task. */
+  /**
+   * Run every source in parallel. Always resolves, one result per task.
+   *
+   * Launches are staggered by a few hundred milliseconds rather than fired all
+   * at once. Measured: TripAdvisor finishes in ~11s on its own but blew a 75s
+   * watchdog roughly half the time inside a six-way fan-out — the work hadn't
+   * got slower, the thundering herd had. A small ramp costs a second of wall
+   * clock and buys back a source.
+   */
   async fanOut(
     tasks: SourceTask[],
     place: Place,
     keywords: Keyword[],
     req: PlanRequest,
   ): Promise<SourceResult[]> {
-    return Promise.all(tasks.map((t) => this.runOne(t, place, keywords, req)))
+    return Promise.all(
+      tasks.map(async (t, i) => {
+        if (i > 0) await sleep(i * this.staggerMs)
+        return this.runOne(t, place, keywords, req)
+      }),
+    )
   }
 
   private async runOne(
@@ -199,7 +226,7 @@ export class BrowserPool {
               sessionId,
               log: (msg) => this.emit({ type: "note", source: task.id, msg }),
             }),
-            this.sourceTimeoutMs,
+            task.timeoutMs ?? this.sourceTimeoutMs,
             task.id,
           )
         ).map((c) => ({ ...c, sessionId }))

@@ -26,6 +26,11 @@ function titleFromHref(href: string): string {
 export const tripadvisor: SourceTask = {
   id: "tripadvisor",
   captcha: true,
+  // Healthy runs finish in 11-14s even for large metros; measured standalone
+  // in Austin and Seattle. It is also the most contention-sensitive source and
+  // the least essential (corroboration only), so cap it well below the pool
+  // default rather than letting a bad run set the wall clock for the plan.
+  timeoutMs: 45_000,
 
   async run({ ctx, place, log }: SourceContext): Promise<Candidate[]> {
     const page = await ctx.newPage()
@@ -38,8 +43,11 @@ export const tripadvisor: SourceTask = {
       const searchUrl =
         "https://www.tripadvisor.com/Search?q=" +
         encodeURIComponent(`${place.city} ${place.state ?? ""} things to do`)
-      await page.goto(searchUrl, { waitUntil: "domcontentloaded", timeout: 30_000 })
-      await page.waitForTimeout(2500)
+      // "commit", not "domcontentloaded" — TripAdvisor keeps a long resource
+      // tail and domcontentloaded intermittently never settled, which is what
+      // blew the watchdog in Burlington and Boise. See sources/eventbrite.ts.
+      await page.goto(searchUrl, { waitUntil: "commit", timeout: 20_000 })
+      await page.waitForTimeout(3500)
 
       const attractionsHref = await page
         .locator("a[href*='Attractions-g']")
@@ -66,9 +74,12 @@ export const tripadvisor: SourceTask = {
       const listUrl = attractionsHref.startsWith("http")
         ? attractionsHref
         : `https://www.tripadvisor.com${attractionsHref}`
-      await page.goto(listUrl, { waitUntil: "domcontentloaded", timeout: 30_000 })
-      await page.waitForSelector("a[href*='/Attraction_Review']", { timeout: 8_000 }).catch(() => {})
-      await page.waitForTimeout(1500)
+      await page.goto(listUrl, { waitUntil: "commit", timeout: 20_000 })
+      // No `waitForSelector` — its polling is not bounded by its own timeout on
+      // a busy page (65s observed against a 6s limit elsewhere in this repo),
+      // and it was the whole reason this source blew its watchdog in Boise.
+      // A bounded settle plus a direct query is faster and cannot hang.
+      await page.waitForTimeout(3000)
 
       // Pin to the listing's own geo id. Validating the LISTING url wasn't
       // enough: TripAdvisor's Tampa page also lists attractions in nearby
