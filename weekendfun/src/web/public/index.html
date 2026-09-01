@@ -68,10 +68,12 @@
       <form class="ask" id="planForm" autocomplete="off">
         <label class="field">
           <span class="field-label">Your town</span>
-          <input id="city" name="city" list="cityList" placeholder="Palm Coast, FL" required
+          <!-- Prefilled, not just a placeholder, so the demo is one click. -->
+          <input id="city" name="city" list="cityList" value="Tampa, FL"
+                 placeholder="Tampa, FL" required
                  autocapitalize="words" spellcheck="false">
           <datalist id="cityList">
-            <option value="Palm Coast, FL"><option value="Tampa, FL"><option value="Austin, TX">
+            <option value="Tampa, FL"><option value="Palm Coast, FL"><option value="Austin, TX">
             <option value="Seattle, WA"><option value="Asheville, NC"><option value="Boise, ID">
             <option value="New Orleans, LA"><option value="Portland, OR">
           </datalist>
