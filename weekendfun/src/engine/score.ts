@@ -12,6 +12,7 @@
  */
 import type { Candidate, PlanRequest, Weather } from "../types.js"
 import { milesBetween } from "../sources/util.js"
+import { eventDateOf, prettyDate } from "../sources/when.js"
 import { isWashout } from "../sources/weather.js"
 
 export interface ScoreComponent {
@@ -98,8 +99,25 @@ export function scoreCandidate(c: Candidate, ctx: ScoreContext): Scored {
   // THIS Saturday and then it's gone. Without this the plan is just "the
   // city's top-rated permanent venues", which is the one thing you didn't
   // need eight browsers to find out.
-  if (c.source === "eventbrite" || c.source === "allevents") {
-    add("happening this weekend", 16, "a dated event, not an everyday venue")
+  //
+  // The bonus used to be awarded on `source === "eventbrite"` alone, while the
+  // sentence beside it claimed the event was happening this weekend. Most of
+  // an events feed is not: a Tampa search for the Sep 5 weekend returned
+  // listings for Sep 19, Sep 23, Sep 26 and Oct 9, each one carrying
+  // "+16 a dated event, not an everyday venue".
+  const when = eventDateOf(c)
+  if (when !== null) {
+    if (ctx.req.days.includes(when)) {
+      add("happening this weekend", 16, `on ${prettyDate(when)}, one of the days you asked for`)
+    } else {
+      // Big enough to sink it outright. An event on the wrong date isn't a
+      // slightly worse suggestion, it's the wrong answer — and the itinerary
+      // refuses to schedule it anyway, so this just keeps the ranked list and
+      // the plan telling the same story.
+      add("wrong weekend", -45, `dated ${prettyDate(when)}, which isn't this weekend`)
+    }
+  } else if (c.source === "eventbrite" || c.source === "allevents") {
+    add("dated event", 5, "an event rather than an everyday venue, though the listing didn't say when")
   }
 
   // ── Price fit ────────────────────────────────────────────────────────────

@@ -12,6 +12,7 @@ import type { Candidate } from "../types.js"
 import type { SourceContext, SourceTask } from "../solari/pool.js"
 import { stateAbbr } from "../place.js"
 import { buildCandidate, guessCategory, isJunkEvent } from "./util.js"
+import { parseEventWhen } from "./when.js"
 
 /** Eventbrite's slug is "<region>--<city>", lowercased and hyphenated:
  *  "fl--tampa", "ny--new-york". Non-US falls back to the country code. */
@@ -26,7 +27,7 @@ export const eventbrite: SourceTask = {
   // Eventbrite fronts Cloudflare in some regions; solving beats retrying.
   captcha: true,
 
-  async run({ ctx, place, log }: SourceContext): Promise<Candidate[]> {
+  async run({ ctx, place, req, log }: SourceContext): Promise<Candidate[]> {
     const page = await ctx.newPage()
     const out = new Map<string, Candidate>()
     const slug = locationSlug(place.city, place.state, place.country)
@@ -92,6 +93,7 @@ export const eventbrite: SourceTask = {
             // Drop business-marketing and virtual listings before they ever
             // reach the scorer — see isJunkEvent.
             if (isJunkEvent(r.title, r.text)) continue
+            const when = parseEventWhen(r.dateText || r.text, req.days)
             const c = buildCandidate({
               source: "eventbrite",
               title: r.title,
@@ -99,10 +101,16 @@ export const eventbrite: SourceTask = {
               category: guessCategory(r.title, "event"),
               evidence: r.dateText ? `${r.dateText} - ${r.title}` : r.text,
               priceRaw: r.priceText,
-              // Deliberately not parsed into a real instant: the card omits the
-              // year and the timezone, so a parsed datetime would be inventing
-              // precision we do not have. The itinerary matches on day name.
-              windows: null,
+              // The card publishes either "Sat, Sep 19" or a bare "Saturday at
+              // 11:00 AM", never a year and never a timezone. Both shapes get
+              // resolved against the days being planned — see when.ts.
+              //
+              // This was `windows: null` under a comment claiming the itinerary
+              // matched on day name. It did not, and neither did anything else:
+              // a September 19th listing scored identically to one on the
+              // Saturday you asked for, and a Saturday party could be scheduled
+              // on Sunday.
+              windows: when ? [{ start: `${when.date}T${when.time ?? "00:00"}` }] : null,
               indoor: null,
             })
             if (!out.has(c.id)) out.set(c.id, c)

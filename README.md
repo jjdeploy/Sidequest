@@ -68,7 +68,7 @@ Three things make it a planner rather than a scraper:
 - **A geolocation gate.** Nothing searches until the browser proves where it is, because a silently-failed override returns plausible results for the wrong city and poisons the store.
 - **It learns.** Rate a plan; the next one is different. Deterministic, inspectable, and it works with the LLM switched off.
 
-Full details, the measured dead ends, and five gotchas that each cost an afternoon: **[weekendfun/README.md](weekendfun/README.md)**.
+Full details, the measured dead ends, and six gotchas that each cost an afternoon: **[weekendfun/README.md](weekendfun/README.md)**.
 
 ---
 

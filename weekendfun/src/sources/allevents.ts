@@ -12,6 +12,7 @@
 import type { Candidate } from "../types.js"
 import type { SourceContext, SourceTask } from "../solari/pool.js"
 import { buildCandidate, guessCategory, isJunkEvent } from "./util.js"
+import { parseEventWhen } from "./when.js"
 
 function citySlug(city: string): string {
   return city.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
@@ -20,7 +21,7 @@ function citySlug(city: string): string {
 export const allevents: SourceTask = {
   id: "allevents",
 
-  async run({ ctx, place, log }: SourceContext): Promise<Candidate[]> {
+  async run({ ctx, place, req, log }: SourceContext): Promise<Candidate[]> {
     const page = await ctx.newPage()
     const out = new Map<string, Candidate>()
     const slug = citySlug(place.city)
@@ -92,6 +93,8 @@ export const allevents: SourceTask = {
           for (const r of rows) {
             if (!r.title || !r.href) continue
             if (isJunkEvent(r.title, r.where)) continue
+            // "Sat, 05 Sep, 2026 - 05:00 PM" and friends — see when.ts.
+            const when = parseEventWhen(r.when || r.title, req.days)
             const c = buildCandidate({
               source: "allevents",
               title: r.title,
@@ -100,6 +103,7 @@ export const allevents: SourceTask = {
               evidence: [r.when, r.where].filter(Boolean).join(" @ ") || r.title,
               priceRaw: r.priceText,
               address: r.where || undefined,
+              windows: when ? [{ start: `${when.date}T${when.time ?? "00:00"}` }] : null,
               indoor: null,
             })
             if (!out.has(c.id)) out.set(c.id, c)

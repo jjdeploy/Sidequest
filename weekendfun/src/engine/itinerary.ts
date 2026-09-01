@@ -18,6 +18,7 @@ import type { PlanRequest, Weather } from "../types.js"
 import type { Scored } from "./score.js"
 import { explain } from "./score.js"
 import { milesBetween } from "../sources/util.js"
+import { eventDateOf } from "../sources/when.js"
 import { isWashout } from "../sources/weather.js"
 
 /** Slots are wall-clock shapes, not exact times — the sources rarely give us
@@ -116,6 +117,16 @@ export function buildItinerary(
       for (const s of ranked) {
         if (used.has(s.candidate.id)) continue
         const c = s.candidate
+
+        // An event happens when it happens.
+        //
+        // The hard constraint, and the one that was missing outright: nothing
+        // in here ever looked at a date, so "SOCIAL HOUSE SATURDAYS" was
+        // scheduled on a Sunday and a September 19th festival was scheduled
+        // for the 5th. Venues have `windows === null` — they're open every
+        // weekend — and stay unconstrained.
+        const happensOn = eventDateOf(c)
+        if (happensOn !== null && happensOn !== date) continue
 
         // Cost is per person; a $40 ticket for a family of four is $160.
         const cost = (c.priceUsd ?? 0) * heads

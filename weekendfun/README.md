@@ -230,13 +230,23 @@ way one dash is enough: `npx tsx src/cli.ts plan "Tampa, FL" --explain`.
 
 Ranking, itinerary assembly and learning are all deterministic code. An LLM in the ranking path would make results unreproducible and learning unmeasurable. If `claude` isn't installed, you lose prose and keep the plan.
 
-## Five things that cost an afternoon
+## Six things that cost an afternoon
 
 Kept here because the Solari cookbook asks for exactly this, and each one produced a plausible-looking wrong answer rather than an error.
 
 - **`waitForSelector` is not bounded by its own timeout.** With `{ timeout: 6_000 }` on a busy SPA it took **65 seconds** — its polling can't get scheduled on a saturated page. It ate the entire source budget while logging nothing. A bounded `waitForTimeout` plus a direct query is both faster and honest; `evaluateAll` on a missing selector returns `[]`, which is the right answer for "no events" anyway.
 - **`waitUntil: "domcontentloaded"` never settles** on sites with a long resource tail. `"commit"` returns in ~1s, and a bounded wait afterwards is enough. 110s hang → 7s.
 - **`closest("section")` can match the entire results container**, so `textContent` returns the whole document. Twenty of those through a greedy `[^•]*` regex wedges the page's JS thread.
+- **The event dates were scraped, displayed, and then thrown away.** Every
+  source set `windows: null` — Eventbrite under a comment claiming "the
+  itinerary matches on day name", which it never did — and the timeliness
+  bonus was awarded on `source === "eventbrite"` alone while its sentence
+  read "a dated event, not an everyday venue". Measured over 206 stored
+  listings, **83 of them were on a different date**, each collecting the same
+  +16 as one on the actual Saturday, and nothing stopped a Saturday-night
+  party being scheduled for Sunday. Dates are parsed now (`sources/when.ts`,
+  100% of those 206), events off the weekend are scored `-45`, and the
+  itinerary refuses to place a dated event on a day it is not happening.
 - **`npm run x -- --flag value` does not pass the flag.** npm 11 parses what
   follows `--` as its own config: it records `--sources timeout` as a boolean
   config named `sources`, drops the flag name from argv, and leaves `timeout`
