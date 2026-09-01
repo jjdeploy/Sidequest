@@ -1,6 +1,7 @@
 /** Shared extraction helpers. Kept boring on purpose — every source depends
  *  on these behaving identically, or the dedupe and the scorer disagree. */
 import { createHash } from "node:crypto"
+import { cleanField } from "./text.js"
 import type { Candidate, Category, SourceId } from "../types.js"
 
 /**
@@ -223,22 +224,26 @@ export interface BuildArgs {
 /** One place that builds a Candidate, so every source produces the same shape. */
 export function buildCandidate(a: BuildArgs): Candidate {
   const price = parsePrice(a.priceRaw)
+  // Every scraped string goes through cleanField, here, once. Six sites means
+  // six sets of markup artifacts, and leaving each scraper to handle its own
+  // meant "&amp; Ho... Read more" was stored as a street address. See text.ts.
+  const title = cleanField(a.title) ?? a.title.trim()
   return {
-    id: candidateId(a.title),
+    id: candidateId(title),
     source: a.source,
-    title: snippet(a.title, 120),
+    title: snippet(title, 120),
     url: a.url,
     category: a.category,
     priceUsd: price.usd,
     priceNote: price.note,
     rating: parseRating(a.ratingRaw),
     reviewCount: parseReviewCount(a.reviewsRaw),
-    address: a.address ? snippet(a.address, 160) : undefined,
+    address: cleanField(a.address)?.slice(0, 160),
     lat: a.lat,
     lng: a.lng,
     windows: a.windows ?? null,
     indoor: a.indoor ?? null,
-    evidence: snippet(a.evidence),
+    evidence: snippet(cleanField(a.evidence) ?? a.evidence),
     scrapedAt: new Date().toISOString(),
   }
 }

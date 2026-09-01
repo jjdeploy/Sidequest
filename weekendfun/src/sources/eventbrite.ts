@@ -11,7 +11,7 @@
 import type { Candidate } from "../types.js"
 import type { SourceContext, SourceTask } from "../solari/pool.js"
 import { stateAbbr } from "../place.js"
-import { buildCandidate, guessCategory, isJunkEvent } from "./util.js"
+import { buildCandidate, guessCategory } from "./util.js"
 import { parseEventWhen } from "./when.js"
 
 /** Eventbrite's slug is "<region>--<city>", lowercased and hyphenated:
@@ -90,9 +90,10 @@ export const eventbrite: SourceTask = {
 
           for (const r of rows) {
             if (!r.title || !r.href.includes("/e/")) continue
-            // Drop business-marketing and virtual listings before they ever
-            // reach the scorer — see isJunkEvent.
-            if (isJunkEvent(r.title, r.text)) continue
+            // The junk filter used to run here and in allevents.ts, and
+            // nowhere else — so a networking seminar from any other source
+            // sailed through. It is now one of the checks in engine/relevance.ts,
+            // applied to every candidate from every source.
             const when = parseEventWhen(r.dateText || r.text, req.days)
             const c = buildCandidate({
               source: "eventbrite",

@@ -231,6 +231,19 @@ async function cmdPlan(args: Args): Promise<void> {
       case "gathered":
         console.log(`\n${e.total} candidates from ${e.ok}/${e.of} sources in ${(e.elapsedMs / 1000).toFixed(1)}s`)
         break
+      case "screened": {
+        const s = e.summary
+        console.log(`${s.admitted} admitted, ${s.rejected} rejected by the relevance gate`)
+        const d = s.byDimension
+        // The unknown counts are the honest part: most candidates carry no
+        // location at all, and saying so beats implying they were checked.
+        console.log(
+          `  place ${d.place.ok} ok / ${d.place.fail} elsewhere / ${d.place.unknown} unknown` +
+            `   ·   time ${d.time.ok} ok / ${d.time.fail} other dates / ${d.time.unknown} undated` +
+            `   ·   kind ${d.kind.fail} filtered`,
+        )
+        break
+      }
       case "taste":
         // Fires immediately before the write-up starts, which is the only
         // part of a plan run that makes the user wait after the answer.

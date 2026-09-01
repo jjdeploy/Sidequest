@@ -252,6 +252,7 @@ function handle(e) {
     case "pool": onPool(e.at, e.event); break
     case "reddit": onReddit(e); break
     case "gathered": onGathered(e); break
+    case "screened": onScreened(e.summary); break
     case "itinerary": state.itinerary = e.itinerary; renderItinerary(e.itinerary); break
     case "taste": renderTaste(e.weights, state.weights); state.weights = e.weights; break
     case "writeup": $("stepWriteup").hidden = false; $("writeup").textContent = e.text; break
@@ -483,6 +484,36 @@ function onGathered(e) {
       saved > 0 ? `${secs(saved)} of waiting the fan-out removes` : "no measurable saving on this run"),
     stat(String(e.total), "candidates", null, "before dedupe and ranking"),
     stat(`${e.of}×`, "browsers", null, state.recording ? "recording on — replays available" : "recording off"),
+  )
+}
+
+/**
+ * What the admission gate did.
+ *
+ * Rendered next to the fan-out numbers on purpose: "110 candidates" means
+ * very little on its own, and the interesting figure is how many of them
+ * turned out to be about the right city on the right days.
+ */
+function onScreened(s) {
+  const box = $("fanoutStats")
+  const d = s.byDimension
+  const cell = (label, ok, bad, unknown, badWord) =>
+    el("div", { class: "stat" }, [
+      el("div", { class: "stat-v", style: bad > 0 ? "color:var(--red)" : "" }, `${bad}`),
+      el("div", { class: "stat-k" }, `${label} — ${badWord}`),
+      el("div", { class: "stat-note" }, `${ok} confirmed · ${unknown} unknown`),
+    ])
+
+  box.append(
+    el("div", { class: "stat", style: "flex-basis:100%;border-color:var(--line-2)" }, [
+      el("div", { class: "stat-v" }, `${s.admitted} admitted`),
+      el("div", { class: "stat-k" }, `relevance gate — ${s.rejected} rejected of ${s.total}`),
+      el("div", { class: "stat-note" },
+        "every candidate, every source: is it near this city, on these days, and a thing you'd go and do?"),
+    ]),
+    cell("place", d.place.ok, d.place.fail, d.place.unknown, "elsewhere"),
+    cell("time", d.time.ok, d.time.fail, d.time.unknown, "other dates"),
+    cell("kind", d.kind.ok, d.kind.fail, d.kind.unknown, "filtered out"),
   )
 }
 

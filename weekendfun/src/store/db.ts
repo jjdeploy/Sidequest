@@ -76,6 +76,18 @@ CREATE TABLE IF NOT EXISTS signals (
 );
 CREATE INDEX IF NOT EXISTS idx_signals_candidate ON signals(candidate_id);
 
+-- Locality name -> coordinates, so the admission gate can ask "is this
+-- actually near the city" without re-geocoding "Palm Coast" every run.
+-- Negative answers are cached too: most misses are not places at all, and
+-- re-asking about them every weekend is the expensive half.
+CREATE TABLE IF NOT EXISTS localities (
+  name       TEXT PRIMARY KEY,
+  lat        REAL,
+  lng        REAL,
+  resolved   INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 -- The learned taste vector: category weights, price tolerance, and so on.
 -- Deliberately a flat key/value table so adding a learned dimension never
 -- needs a migration.
@@ -396,6 +408,27 @@ export class Store {
     this.db.prepare(`DELETE FROM signals WHERE candidate_id = ? AND kind = ?`).run(candidateId, kind)
     const after = (this.db.prepare(`SELECT COUNT(*) AS n FROM signals`).get() as { n: number }).n
     return before - after
+  }
+
+  /** Cached locality lookup. `undefined` means never asked, `null` means
+   *  asked and it isn't a place. */
+  getLocality(name: string): { lat: number; lng: number } | null | undefined {
+    const row = this.db
+      .prepare(`SELECT lat, lng, resolved FROM localities WHERE name = ?`)
+      .get(name.toLowerCase()) as { lat: number | null; lng: number | null; resolved: number } | undefined
+    if (!row) return undefined
+    return row.resolved && row.lat !== null && row.lng !== null ? { lat: row.lat, lng: row.lng } : null
+  }
+
+  putLocality(name: string, hit: { lat: number; lng: number } | null): void {
+    this.db
+      .prepare(
+        `INSERT INTO localities (name, lat, lng, resolved, updated_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(name) DO UPDATE SET
+           lat = excluded.lat, lng = excluded.lng,
+           resolved = excluded.resolved, updated_at = excluded.updated_at`,
+      )
+      .run(name.toLowerCase(), hit?.lat ?? null, hit?.lng ?? null, hit ? 1 : 0, new Date().toISOString())
   }
 
   counts(): { candidates: number; sightings: number; signals: number; runs: number } {

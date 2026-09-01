@@ -11,7 +11,7 @@
  */
 import type { Candidate } from "../types.js"
 import type { SourceContext, SourceTask } from "../solari/pool.js"
-import { buildCandidate, guessCategory, isJunkEvent } from "./util.js"
+import { buildCandidate, guessCategory } from "./util.js"
 import { parseEventWhen } from "./when.js"
 
 function citySlug(city: string): string {
@@ -92,7 +92,6 @@ export const allevents: SourceTask = {
 
           for (const r of rows) {
             if (!r.title || !r.href) continue
-            if (isJunkEvent(r.title, r.where)) continue
             // "Sat, 05 Sep, 2026 - 05:00 PM" and friends — see when.ts.
             const when = parseEventWhen(r.when || r.title, req.days)
             const c = buildCandidate({

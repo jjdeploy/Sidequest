@@ -19,6 +19,8 @@ import { randomUUID } from "node:crypto"
 import { buildItinerary, type Itinerary } from "./engine/itinerary.js"
 import { buildKeywords, type Keyword } from "./engine/keywords.js"
 import { describeTaste } from "./engine/learn.js"
+import { makeLocalityResolver } from "./engine/localities.js"
+import { screen, type ScreenSummary, type Verdict } from "./engine/relevance.js"
 import { rank, type Scored, type ScoreContext } from "./engine/score.js"
 import { claudeAvailable, parseIntake, writeUp } from "./llm/claude.js"
 import { geocode } from "./place.js"
@@ -144,6 +146,7 @@ export type PlanEvent =
   | { type: "reddit"; found: number; configured: boolean }
   | { type: "weather"; weather: Weather[] }
   | { type: "gathered"; total: number; ok: number; of: number; elapsedMs: number; sequentialMs: number }
+  | { type: "screened"; summary: ScreenSummary }
   | { type: "ranked"; top: RankedView[] }
   | { type: "itinerary"; planId: string; runId: string; itinerary: ItineraryView }
   | { type: "taste"; taste: string[]; weights: Record<string, number> }
@@ -247,6 +250,9 @@ export interface PlanOutcome {
   req: PlanRequest
   keywords: Keyword[]
   results: SourceResult[]
+  /** What the admission gate admitted and rejected, and why. */
+  screening: ScreenSummary
+  verdicts: Map<string, Verdict>
   weather: Weather[]
   ranked: Scored[]
   itinerary: Itinerary
@@ -348,36 +354,66 @@ export async function runPlan(
     )
   }
 
-  // 3. Persist, then score against everything we've ever learned.
+  // 3. The admission gate: is each candidate actually about what was asked
+  //    for — the right place, the right days, and a thing you'd go and do?
+  //    See engine/relevance.ts for why this is one gate and not six filters.
+  const { verdicts, summary } = await screen(all, {
+    place: req.place,
+    req,
+    resolveLocality: makeLocalityResolver(store, req.place),
+  })
+  emit({ type: "screened", summary })
+
+  // Rejects never reach the store. Keeping them would inflate corroboration
+  // ("three sources agree" on a networking seminar) and leave the learner
+  // with categories for things that were never offered.
+  const kept = results.map((r) => ({
+    ...r,
+    candidates: r.candidates.filter((c) => !verdicts.get(c.id)?.fatal),
+  }))
+  const admitted = kept.flatMap((r) => r.candidates)
+
+  if (admitted.length === 0) {
+    throw new NoCandidatesError(
+      `Found ${all.length} listings but none survived screening — nothing was in ` +
+        `${req.place.city} on ${req.days.join(" or ")}. Try a wider budget or different days.`,
+    )
+  }
+
+  // 4. Persist, then score against everything we've ever learned.
   store.recordRun(runId, req, elapsedMs)
-  store.saveResults(runId, results)
+  store.saveResults(runId, kept)
 
   const weights = store.getWeights()
   const ctx: ScoreContext = {
     req,
     weather,
     corroboration: store.corroborationFor(runId),
-    history: store.historyFor([...new Set(all.map((c) => c.id))]),
+    history: store.historyFor([...new Set(admitted.map((c) => c.id))]),
     weights,
+    relevance: verdicts,
   }
-  const ranked = rank(all, ctx)
+  const ranked = rank(admitted, ctx)
   emit({ type: "ranked", top: ranked.slice(0, 40).map(toView) })
 
-  // 4. Assemble.
+  // 5. Assemble.
   const itinerary = buildItinerary(ranked, req, weather)
   const planId = randomUUID()
   store.savePlan(planId, runId, `${req.place.label} ${req.days[0]}`, itinerary.days)
   emit({ type: "itinerary", planId, runId, itinerary: itineraryView(itinerary, req.budgetUsd) })
   emit({ type: "taste", taste: describeTaste(weights), weights })
 
-  // 5. Optional prose. Never on the critical path — the plan is already sent.
+  // 6. Optional prose. Never on the critical path — the plan is already sent.
   let prose: string | null = null
   if ((opts.writeup ?? true) && (await claudeAvailable())) {
     prose = await writeUp(summarizeForWriteUp(itinerary, req))
     if (prose) emit({ type: "writeup", text: prose })
   }
 
-  return { runId, planId, req, keywords, results, weather, ranked, itinerary, elapsedMs, weights, writeup: prose }
+  return {
+    runId, planId, req, keywords, results, weather, ranked, itinerary,
+    elapsedMs, weights, writeup: prose, screening: summary, verdicts,
+  }
 }
 
 /** Compact text handed to Claude for the write-up. */
