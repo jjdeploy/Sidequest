@@ -90,6 +90,8 @@ export interface SightingRow {
   source: string
   evidence: string
   sessionId: string | null
+  /** How many separate runs this source has found the venue on. */
+  runs: number
 }
 
 export class Store {
@@ -321,6 +323,79 @@ export class Store {
         `SELECT id, created_at, place_label, elapsed_ms FROM runs ORDER BY created_at DESC LIMIT ?`,
       )
       .all(limit) as Array<{ id: string; created_at: string; place_label: string; elapsed_ms: number }>
+  }
+
+  /**
+   * Which sources have seen this venue, newest sighting first — one row per
+   * SOURCE, not one per sighting.
+   *
+   * The raw table has a row per source per run, so a venue found by three
+   * sources across three weekends returns nine rows, and the dashboard listed
+   * "google-maps" three times under a heading that said "3 independent
+   * sources". Corroboration counts DISTINCT sources, so the evidence list has
+   * to be collapsed the same way or it contradicts the number above it.
+   *
+   * Deduped here rather than in SQL: the grouping needs the newest row's
+   * evidence AND session id together, which is a window function or a
+   * self-join for what is a handful of rows.
+   */
+  sightingsFor(candidateId: string): SightingRow[] {
+    const rows = this.db
+      .prepare(
+        `SELECT source, evidence, session_id AS sessionId, run_id AS runId
+         FROM sightings WHERE candidate_id = ?
+         ORDER BY scraped_at DESC`,
+      )
+      .all(candidateId) as unknown as Array<SightingRow & { runId: string }>
+
+    const bySource = new Map<string, SightingRow>()
+    const runs = new Map<string, Set<string>>()
+    for (const r of rows) {
+      if (!bySource.has(r.source)) {
+        bySource.set(r.source, { source: r.source, evidence: r.evidence, sessionId: r.sessionId, runs: 0 })
+      }
+      const seen = runs.get(r.source) ?? new Set<string>()
+      seen.add(r.runId)
+      runs.set(r.source, seen)
+    }
+    for (const [source, row] of bySource) row.runs = runs.get(source)?.size ?? 1
+    return [...bySource.values()]
+  }
+
+  /** The most recent plan, so the dashboard can show something on a cold
+   *  load instead of an empty page with a form on it. */
+  latestPlan(): { id: string; runId: string; createdAt: string; title: string; items: unknown } | null {
+    const row = this.db
+      .prepare(
+        `SELECT id, run_id AS runId, created_at AS createdAt, title, items_json AS itemsJson
+         FROM plans ORDER BY created_at DESC LIMIT 1`,
+      )
+      .get() as { id: string; runId: string; createdAt: string; title: string; itemsJson: string } | undefined
+    if (!row) return null
+    return { id: row.id, runId: row.runId, createdAt: row.createdAt, title: row.title, items: JSON.parse(row.itemsJson) }
+  }
+
+  /** Recent feedback, with the venue it was about. The dashboard shows this
+   *  next to the taste vector so a weight change has a visible cause. */
+  recentSignals(limit = 12): Array<{ candidateId: string; title: string; category: string; kind: string; value: number; createdAt: string }> {
+    return this.db
+      .prepare(
+        `SELECT s.candidate_id AS candidateId, c.title AS title, c.category AS category,
+                s.kind AS kind, s.value AS value, s.created_at AS createdAt
+         FROM signals s JOIN candidates c ON c.id = s.candidate_id
+         ORDER BY s.created_at DESC LIMIT ?`,
+      )
+      .all(limit) as Array<{ candidateId: string; title: string; category: string; kind: string; value: number; createdAt: string }>
+  }
+
+  /** Undo. The learner is a full recompute from signal history, so deleting a
+   *  signal genuinely removes its effect — which is only true because nothing
+   *  incremental is cached anywhere. */
+  deleteSignal(candidateId: string, kind: string): number {
+    const before = (this.db.prepare(`SELECT COUNT(*) AS n FROM signals`).get() as { n: number }).n
+    this.db.prepare(`DELETE FROM signals WHERE candidate_id = ? AND kind = ?`).run(candidateId, kind)
+    const after = (this.db.prepare(`SELECT COUNT(*) AS n FROM signals`).get() as { n: number }).n
+    return before - after
   }
 
   counts(): { candidates: number; sightings: number; signals: number; runs: number } {

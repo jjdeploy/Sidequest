@@ -5,13 +5,14 @@
   "type": "module",
   "description": "Parallel geo-pinned cloud browsers that plan your weekend, and learn what you actually like.",
   "scripts": {
-    "plan": "tsx src/cli.ts plan",
-    "sources": "tsx src/cli.ts sources",
-    "geo-proof": "tsx src/geo-proof.ts",
-    "feedback": "tsx src/cli.ts feedback",
-    "history": "tsx src/cli.ts history",
-    "typecheck": "tsc --noEmit",
-    "harden": "tsx src/harden.ts"
+    "plan": "tsx --env-file-if-exists=.env src/cli.ts plan",
+    "dashboard": "tsx --env-file-if-exists=.env src/web/server.ts",
+    "sources": "tsx --env-file-if-exists=.env src/cli.ts sources",
+    "feedback": "tsx --env-file-if-exists=.env src/cli.ts feedback",
+    "history": "tsx --env-file-if-exists=.env src/cli.ts history",
+    "geo-proof": "tsx --env-file-if-exists=.env src/geo-proof.ts",
+    "harden": "tsx --env-file-if-exists=.env src/harden.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@solarisdk/browser": "^0.1.1",

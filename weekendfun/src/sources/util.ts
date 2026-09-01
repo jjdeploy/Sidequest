@@ -97,21 +97,30 @@ export function parseReviewCount(raw: string | null | undefined): number | null 
 export function guessCategory(text: string, fallback: Category = "other"): Category {
   const s = text.toLowerCase()
   const rules: Array<[RegExp, Category]> = [
-    [/museum|gallery|history|historic|theat|art|exhibit|library/, "culture"],
-    [/\b(bars?|brewer\w*|cocktails?|wine|pubs?|distiller\w*|taproom|cider)\b/, "drink"],
+    // Every pattern is word-anchored. Four of these were not, and each
+    // unanchored token found a word to hide in: "art" matched "Block
+    // P-art-y" and filed a street party under culture, "park" matched
+    // "S-park-man Wharf", "zoo" matched "Bazooka". The category is not
+    // cosmetic — it is what feedback teaches the learner about, so a wrong
+    // one quietly trains a preference the user never expressed.
+    //
+    // Prefixes that ARE deliberate keep an explicit \w*: theat(re|er),
+    // brewer(y|ies), historic(al), amphitheat(re|er).
+    [/\b(museums?|galler(?:y|ies)|history|historic\w*|theat\w*|arts?|artists?|exhibits?|librar(?:y|ies)|cultural|heritage)\b/, "culture"],
+    [/\b(bars?|brewer\w*|brewing|cocktails?|wine|pubs?|distiller\w*|taproom|cider|speakeasy)\b/, "drink"],
     [/\b(clubs?|nightlife|dancing?|dj|lounges?)\b/, "nightlife"],
-    [/concert|live music|band|venue|jazz|symphony|amphitheat/, "music"],
-    [/park|trail|garden|beach|hike|nature|lake|river|botanic/, "outdoors"],
-    [/\b(kayak\w*|bikes?|biking|climbing|gyms?|surf\w*|skat\w+|paddle\w*|yoga|pilates|fitness|workout|bootcamp|run(?:ning)? club|golf|tennis|hiking)\b/, "active"],
-    [/zoo|aquarium|playground|children|kids|family|amusement|arcade/, "family"],
-    [/\b(markets?|shops?|shopping|boutiques?|malls?|thrift|vintage|bookstores?)\b/, "shopping"],
-    // Word boundaries matter here: an unanchored "eat" matched "Gr-eat Escape
-    // Room" and filed an escape room under food. Same trap for "bar" in
-    // "Barnes", "spa" in "space".
-    [/\b(restaurants?|food|cafes?|coffee|brunch|dinner|eatery|bakery|tacos?|pizza|bbq|grill|kitchen|diner)\b/, "food"],
-    // "tour" must stay anchored — unanchored it matched "Tourist attraction"
-    // and filed every Maps landmark under events.
-    [/\b(festivals?|fairs?|events?|shows?|guided tours?|parades?|meetups?)\b/, "event"],
+    [/\b(concerts?|live music|bands?|music venue|jazz|symphony|orchestra|amphitheat\w*|open mic)\b/, "music"],
+    [/\b(parks?|trails?|gardens?|beach\w*|hikes?|hiking|nature|lakes?|rivers?|botanical?|waterfront|greenway|boardwalk)\b/, "outdoors"],
+    [/\b(kayak\w*|bikes?|biking|climbing|gyms?|surf\w*|skat\w+|paddle\w*|yoga|pilates|fitness|workout|bootcamp|run(?:ning)? club|golf|tennis)\b/, "active"],
+    [/\b(zoos?|aquariums?|playgrounds?|children|kids|family|amusement|arcades?|petting farm)\b/, "family"],
+    // Food is tested BEFORE shopping, and the order is the fix: these rules
+    // are first-match-wins and "shop" is the most promiscuous token in the
+    // list. "Blind Tiger Coffee Roasters - Tampa City Center Cafe - Coffee
+    // Shop" matched the shopping rule and was filed under shopping. Every
+    // "<food> shop" has that shape; no shopping venue is called coffee.
+    [/\b(restaurants?|food|cafes?|coffee|espresso|brunch|dinner|eatery|bakery|patisserie|deli|sandwich\w*|tacos?|taqueria|pizza|bbq|barbecue|grill|kitchen|diner|bistro|burgers?|noodle|ramen|sushi|seafood|creamery|ice cream|donuts?|doughnuts?)\b/, "food"],
+    [/\b(markets?|shops?|shopping|boutiques?|malls?|thrift|vintage|bookstores?|antiques?)\b/, "shopping"],
+    [/\b(festivals?|fairs?|events?|shows?|guided tours?|parades?|meetups?|part(?:y|ies)|celebrations?)\b/, "event"],
   ]
   for (const [re, cat] of rules) if (re.test(s)) return cat
   return fallback

@@ -10,7 +10,8 @@ Built on [Solari](https://getsolari.com) — a fork of the [Solari cookbook](htt
 cd weekendfun
 npm install
 cp .env.example .env      # add your SOLARI_API_KEY
-npm run plan -- "Tampa, FL" --vibes "chill, live music" --budget 220
+npm run plan -- "Tampa, FL" -- --vibes "chill, live music" --budget 220
+npm run dashboard         # ...or watch it happen, at localhost:5173
 ```
 
 ```
@@ -38,6 +39,15 @@ Saturday, Sep 5  85°/78°F, thunderstorms, 66% rain
              a dated event, not an everyday venue; free
 ```
 
+## Or watch it happen
+
+![The WeekendFun dashboard](weekendfun/docs/dashboard.jpg)
+
+`npm run dashboard` puts the fan-out on one clock — a lane per browser, the
+striped head of each bar being the geolocation gate and the solid part the
+source actually reading. Underneath: the plan on a map, thumbs that feed the
+learner, and an rrweb replay of the browser session that found each venue.
+
 ## Why it needs cloud browsers
 
 Google Maps, Groupon, Eventbrite and Yelp all answer *"what's on this weekend"* differently depending on **where the browser is**. You cannot `fetch()` your way to a local answer.
@@ -58,7 +68,7 @@ Three things make it a planner rather than a scraper:
 - **A geolocation gate.** Nothing searches until the browser proves where it is, because a silently-failed override returns plausible results for the wrong city and poisons the store.
 - **It learns.** Rate a plan; the next one is different. Deterministic, inspectable, and it works with the LLM switched off.
 
-Full details, the measured dead ends, and four gotchas that each cost an afternoon: **[weekendfun/README.md](weekendfun/README.md)**.
+Full details, the measured dead ends, and five gotchas that each cost an afternoon: **[weekendfun/README.md](weekendfun/README.md)**.
 
 ---
 

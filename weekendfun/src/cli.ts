@@ -5,21 +5,20 @@
  *   npm run plan -- "Seattle, WA" --ask "cheap date night, no driving"
  *   npm run feedback -- <candidate-id> did
  *   npm run history
+ *
+ * The orchestration lives in pipeline.ts, which the dashboard also calls.
+ * Everything here is argument parsing and rendering to a terminal.
  */
-import { randomUUID } from "node:crypto"
 import { resolve } from "node:path"
-import { geocode } from "./place.js"
-import { buildKeywords } from "./engine/keywords.js"
-import { BrowserPool, type PoolEvent } from "./solari/pool.js"
-import { ALL_SOURCES, sourcesByName } from "./sources/index.js"
-import { fetchWeather } from "./sources/weather.js"
-import { fetchReddit, redditConfigured } from "./sources/reddit.js"
-import { rank, type ScoreContext } from "./engine/score.js"
-import { buildItinerary, type Itinerary } from "./engine/itinerary.js"
 import { describeTaste, relearn } from "./engine/learn.js"
+import { claudeAvailable } from "./llm/claude.js"
+import { NoCandidatesError, resolvePlanRequest, runPlan, type PlanEvent } from "./pipeline.js"
+import type { Itinerary } from "./engine/itinerary.js"
+import { ALL_SOURCES } from "./sources/index.js"
+import { redditConfigured } from "./sources/reddit.js"
 import { Store } from "./store/db.js"
-import { claudeAvailable, parseIntake, writeUp } from "./llm/claude.js"
-import type { Candidate, PlanRequest, SourceResult, Weather } from "./types.js"
+import type { Mobility, PlanRequest } from "./types.js"
+import type { PoolEvent } from "./solari/pool.js"
 
 const DB_PATH = process.env.WEEKENDFUN_DB ?? resolve(process.cwd(), "data", "weekendfun.db")
 
@@ -57,40 +56,53 @@ const num = (a: Args, k: string, d: number) => {
   return Number.isFinite(n) ? n : d
 }
 const bool = (a: Args, k: string) => a.flags[k] === true || a.flags[k] === "true"
+const list = (a: Args, k: string) =>
+  (str(a, k, "") ?? "").split(",").map((s) => s.trim()).filter(Boolean)
+
 
 /**
- * The upcoming Saturday and Sunday, as local dates in the target city.
- *
- * Deliberately does all arithmetic on Y/M/D integers via `Date.UTC`, never on
- * a local `Date`. The obvious version — build a local Date, add days, call
- * `toISOString().slice(0,10)` — silently shifts the answer by a day, because
- * `toISOString` converts to UTC first. It planned Sunday and Monday for a
- * request made on a Monday in Florida.
+ * Every flag this CLI takes. Only used to notice when npm has eaten them.
  */
-function nextWeekend(timezone: string): string[] {
-  const now = new Date()
-  // en-CA formats as YYYY-MM-DD, which is exactly the shape we store.
-  const ymd = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now)
-  const weekday = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    weekday: "short",
-  }).format(now)
+const KNOWN_FLAGS = [
+  "vibes", "budget", "adults", "kids", "mobility", "avoid", "days", "ask",
+  "sources", "concurrency", "retries", "keywords", "source-timeout",
+  "explain", "record", "writeup",
+]
 
-  const idx = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(weekday)
-  // Already the weekend? Plan THIS one — someone asking on Saturday morning
-  // means today, not eight days out.
-  const daysToSat = idx === 6 ? 0 : idx === 0 ? -1 : 6 - idx
+/**
+ * Warn when npm swallowed the flags instead of forwarding them.
+ *
+ * npm 11 parses the arguments after `--` as its own config before handing
+ * them on. An unrecognised `--sources timeout` becomes the npm config
+ * "sources" with the value `true`, the flag NAME is dropped from argv, and
+ * the value is left behind as a stray positional. So:
+ *
+ *   npm run plan -- "Tampa, FL" --sources timeout --budget 150
+ *
+ * ran a full six-source plan on the default budget and said nothing. Getting
+ * the wrong answer quietly is the worst outcome available, and this is
+ * precisely detectable: npm leaves `npm_config_sources` in the environment
+ * for a flag that never reached our parser.
+ *
+ * The values themselves are gone (npm recorded "true", not "timeout"), so
+ * there is nothing to recover — only something to say.
+ */
+function warnIfNpmAteFlags(args: Args): void {
+  const eaten = KNOWN_FLAGS.filter((flag) => {
+    const key = `npm_config_${flag.replace(/-/g, "_")}`
+    if (process.env[key] === undefined) return false
+    // `--no-writeup` arrives as npm_config_writeup="", so check both spellings.
+    return args.flags[flag] === undefined && args.flags[`no-${flag}`] === undefined
+  })
+  if (eaten.length === 0) return
 
-  const [y, m, d] = ymd.split("-").map(Number) as [number, number, number]
-  const base = Date.UTC(y, m - 1, d)
-  const DAY = 86_400_000
-  const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10)
-  return [iso(base + daysToSat * DAY), iso(base + (daysToSat + 1) * DAY)]
+  const shown = eaten.map((f) => `--${f}`).join(", ")
+  console.error(`\n\x1b[33mnpm swallowed these flags: ${shown}\x1b[0m`)
+  console.error(`npm parses what follows \`--\` as its own config. Add a second \`--\`:`)
+  console.error(`  npm run plan -- "${args._[0] ?? "Tampa, FL"}" -- ${shown.split(", ").join(" ")}`)
+  console.error(`...or skip npm entirely:`)
+  console.error(`  npx tsx src/cli.ts plan "${args._[0] ?? "Tampa, FL"}" ${shown.split(", ").join(" ")}`)
+  console.error(`Continuing with defaults for those.\n`)
 }
 
 // ─────────────────────────────────────────────────────────── rendering
@@ -158,171 +170,121 @@ function renderItinerary(it: Itinerary, req: PlanRequest, verbose: boolean): voi
   for (const note of it.notes) console.log(`Note: ${note}`)
 }
 
-/** Compact text handed to Claude for the write-up. */
-function summarize(it: Itinerary, req: PlanRequest): string {
-  const lines = [`Trip: ${req.place.label}. Party: ${req.party.adults} adults, ${req.party.kids} kids. Budget: $${req.budgetUsd}. Getting around by ${req.mobility}. Vibes: ${req.vibes.join(", ") || "unspecified"}.`]
-  for (const day of it.days) {
-    const w = day.weather
-    lines.push(`\n${day.date}${w ? ` (${w.highF}F, ${w.summary}, ${w.precipChance}% rain)` : ""}:`)
-    for (const item of day.items) {
-      const c = item.scored.candidate
-      lines.push(`- ${item.slot}: ${c.title} (${c.category}, ${c.priceUsd === null ? "price unknown" : c.priceUsd === 0 ? "free" : "$" + c.priceUsd}). Evidence: ${c.evidence.slice(0, 160)}`)
-    }
-  }
-  lines.push(`\nTotal cost: $${it.totalUsd.toFixed(0)}.`)
-  return lines.join("\n")
-}
-
 // ─────────────────────────────────────────────────────────── commands
 
 async function cmdPlan(args: Args): Promise<void> {
   const apiKey = process.env.SOLARI_API_KEY
   if (!apiKey) throw new Error("SOLARI_API_KEY is not set. Copy .env.example to .env and add your key.")
 
+  warnIfNpmAteFlags(args)
+
   const where = args._[0]
   if (!where) throw new Error('Where to? e.g. npm run plan -- "Tampa, FL"')
 
-  // 1. Resolve the place. Ambiguity is surfaced, never silently resolved.
-  const { best: place, alternates } = await geocode(where)
+  // Resolve the place first. Ambiguity is surfaced, never silently resolved.
+  const days = list(args, "days")
+  const { req, alternates, askNote } = await resolvePlanRequest(where, {
+    days: days.length ? days : undefined,
+    adults: num(args, "adults", 2),
+    kids: num(args, "kids", 0),
+    budgetUsd: num(args, "budget", 200),
+    vibes: list(args, "vibes"),
+    mobility: (str(args, "mobility", "car") as Mobility) ?? "car",
+    avoid: list(args, "avoid"),
+    ask: str(args, "ask"),
+  })
+
   console.log(`\n${BAR}`)
-  console.log(`WeekendFun — ${place.label}`)
+  console.log(`WeekendFun — ${req.place.label}`)
   console.log(BAR)
   if (alternates.length > 0) {
     console.log(`(also matched ${alternates.map((a) => a.label).join(", ")} — qualify the name to pick another)`)
   }
+  if (askNote) console.log(`Read your request as: ${askNote}`)
+  console.log(
+    `${req.days.join(" and ")} · ${req.party.adults} adults${req.party.kids ? ` + ${req.party.kids} kids` : ""}` +
+      ` · $${req.budgetUsd} · ${req.mobility}`,
+  )
 
-  // 2. Build the request.
-  const req: PlanRequest = {
-    place,
-    days: str(args, "days")?.split(",").map((d) => d.trim()) ?? nextWeekend(place.timezone),
-    party: { adults: num(args, "adults", 2), kids: num(args, "kids", 0) },
-    budgetUsd: num(args, "budget", 200),
-    vibes: (str(args, "vibes", "") ?? "").split(",").map((v) => v.trim()).filter(Boolean),
-    mobility: (str(args, "mobility", "car") as PlanRequest["mobility"]) ?? "car",
-    avoid: (str(args, "avoid", "") ?? "").split(",").map((v) => v.trim()).filter(Boolean),
-  }
+  // Checked up front so the "Writing it up…" line is only printed when
+  // something is actually going to be written.
+  const wantsWriteUp = !bool(args, "no-writeup") && (await claudeAvailable())
+  const explain = bool(args, "explain")
 
-  // Free-text intake, when asked for and when Claude is available.
-  const askText = str(args, "ask")
-  if (askText) {
-    const parsed = await parseIntake(askText)
-    if (parsed) {
-      if (parsed.vibes?.length) req.vibes = [...req.vibes, ...parsed.vibes]
-      if (parsed.budgetUsd) req.budgetUsd = parsed.budgetUsd
-      if (parsed.adults) req.party.adults = parsed.adults
-      if (parsed.kids !== undefined) req.party.kids = parsed.kids
-      if (parsed.kidAges?.length) req.party.kidAges = parsed.kidAges
-      if (parsed.mobility) req.mobility = parsed.mobility
-      if (parsed.avoid?.length) req.avoid = [...req.avoid, ...parsed.avoid]
-      console.log(`Read your request as: ${req.vibes.join(", ")} · $${req.budgetUsd} · ${req.mobility}`)
-    } else {
-      console.log("(couldn't parse --ask; using flag defaults)")
+  const render = (e: PlanEvent): void => {
+    switch (e.type) {
+      case "keywords":
+        console.log(`\nSearching for ${e.keywords.length} things:`)
+        for (const k of e.keywords.slice(0, 6)) console.log(`  · ${k.term}  \x1b[2m(${k.because})\x1b[0m`)
+        if (e.keywords.length > 6) console.log(`  · …and ${e.keywords.length - 6} more`)
+        break
+      case "launching":
+        console.log(`\nLaunching ${e.sources.length} cloud browsers in parallel:`)
+        break
+      case "pool":
+        renderProgress(e.event)
+        break
+      case "reddit":
+        if (e.found > 0) console.log(`  ● ${"reddit".padEnd(13)} ${String(e.found).padStart(3)} found (official API)`)
+        else if (!e.configured) console.log(`  ○ ${"reddit".padEnd(13)} skipped (no REDDIT_CLIENT_ID — see sources/reddit.ts)`)
+        break
+      case "gathered":
+        console.log(`\n${e.total} candidates from ${e.ok}/${e.of} sources in ${(e.elapsedMs / 1000).toFixed(1)}s`)
+        break
+      case "taste":
+        // Fires immediately before the write-up starts, which is the only
+        // part of a plan run that makes the user wait after the answer.
+        if (wantsWriteUp) console.log("\nWriting it up…")
+        break
+      default:
+        break
     }
   }
-
-  console.log(`${req.days.join(" and ")} · ${req.party.adults} adults${req.party.kids ? ` + ${req.party.kids} kids` : ""} · $${req.budgetUsd} · ${req.mobility}`)
-
-  // 3. Decide what to search for BEFORE spending a single browser session.
-  const keywords = buildKeywords(req, num(args, "keywords", 8))
-  console.log(`\nSearching for ${keywords.length} things:`)
-  for (const k of keywords.slice(0, 6)) console.log(`  · ${k.term}  \x1b[2m(${k.because})\x1b[0m`)
-  if (keywords.length > 6) console.log(`  · …and ${keywords.length - 6} more`)
-
-  // 4. Fan out.
-  const sources = sourcesByName((str(args, "sources", "") ?? "").split(",").map((s) => s.trim()).filter(Boolean))
-  console.log(`\nLaunching ${sources.length} cloud browsers in parallel:`)
 
   const store = new Store(DB_PATH)
-  const runId = randomUUID()
-  const pool = new BrowserPool({
-    apiKey,
-    maxConcurrent: num(args, "concurrency", 12),
-    recording: bool(args, "record"),
-    retries: num(args, "retries", 1),
-    sourceTimeoutMs: num(args, "source-timeout", 90) * 1000,
-    onEvent: renderProgress,
-  })
-
-  const started = Date.now()
-  let results: SourceResult[] = []
-  let weather: Weather[] = []
   try {
-    const [browserResults, wx, redditCandidates] = await Promise.all([
-      pool.fanOut(sources, place, keywords, req),
-      fetchWeather(place, req.days).catch(() => [] as Weather[]),
-      // Not a browser source — Reddit blocks all scraping, so this is the
-      // official API and runs alongside the fan-out for free.
-      fetchReddit(place, (msg) => {
-        if (process.env.WEEKENDFUN_VERBOSE) console.log(`      reddit: ${msg}`)
-      }),
-    ])
-    results = browserResults
-    weather = wx
+    const outcome = await runPlan(
+      req,
+      store,
+      {
+        apiKey,
+        sources: list(args, "sources"),
+        concurrency: num(args, "concurrency", 12),
+        retries: num(args, "retries", 1),
+        sourceTimeoutMs: num(args, "source-timeout", 90) * 1000,
+        keywordLimit: num(args, "keywords", 8),
+        record: bool(args, "record"),
+        writeup: wantsWriteUp,
+        verbose: Boolean(process.env.WEEKENDFUN_VERBOSE),
+      },
+      render,
+    )
 
-    if (redditCandidates.length > 0) {
-      console.log(`  ● ${"reddit".padEnd(13)} ${String(redditCandidates.length).padStart(3)} found (official API)`)
-      results.push({ source: "reddit", candidates: redditCandidates, elapsedMs: 0 })
-    } else if (!redditConfigured()) {
-      console.log(`  ○ ${"reddit".padEnd(13)} skipped (no REDDIT_CLIENT_ID — see sources/reddit.ts)`)
-    }
-  } finally {
-    // REQUIRED: the client holds a loopback proxy open, and that handle keeps
-    // the event loop alive. Without this the CLI prints the plan and hangs.
-    await pool.close()
-  }
+    renderItinerary(outcome.itinerary, req, explain)
 
-  const elapsed = Date.now() - started
-  const all: Candidate[] = results.flatMap((r) => r.candidates)
-  const failed = results.filter((r) => r.error)
-  console.log(`\n${all.length} candidates from ${results.length - failed.length}/${results.length} sources in ${(elapsed / 1000).toFixed(1)}s`)
-
-  if (all.length === 0) {
-    console.log("\nNothing found. Every source failed — check your connection and SOLARI_API_KEY.")
-    store.close()
-    process.exitCode = 1
-    return
-  }
-
-  // 5. Persist, then score against everything we've ever learned.
-  store.recordRun(runId, req, elapsed)
-  store.saveResults(runId, results)
-
-  const ctx: ScoreContext = {
-    req,
-    weather,
-    corroboration: store.corroborationFor(runId),
-    history: store.historyFor([...new Set(all.map((c) => c.id))]),
-    weights: store.getWeights(),
-  }
-  const ranked = rank(all, ctx)
-
-  // 6. Assemble and show.
-  const itinerary = buildItinerary(ranked, req, weather)
-  renderItinerary(itinerary, req, bool(args, "explain"))
-
-  const planId = randomUUID()
-  store.savePlan(planId, runId, `${place.label} ${req.days[0]}`, itinerary.days)
-
-  // 7. Optional prose write-up.
-  if (!bool(args, "no-writeup") && (await claudeAvailable())) {
-    console.log("\nWriting it up…")
-    const prose = await writeUp(summarize(itinerary, req))
-    if (prose) {
+    if (outcome.writeup) {
       console.log(`\n${BAR}`)
-      console.log(prose)
+      console.log(outcome.writeup)
       console.log(BAR)
     }
-  }
 
-  const taste = describeTaste(ctx.weights)
-  console.log(`\nWhat I know about you so far: ${taste.join(" · ")}`)
-  console.log(`\nTell me how it went and the next plan gets better:`)
-  const first = itinerary.days[0]?.items[0]
-  if (first) {
-    console.log(`  npm run feedback -- ${first.scored.candidate.id.slice(0, 8)} did`)
-    console.log(`  npm run feedback -- ${first.scored.candidate.id.slice(0, 8)} rated 5`)
+    console.log(`\nWhat I know about you so far: ${describeTaste(outcome.weights).join(" · ")}`)
+    console.log(`\nTell me how it went and the next plan gets better:`)
+    const first = outcome.itinerary.days[0]?.items[0]
+    if (first) {
+      console.log(`  npm run feedback -- ${first.scored.candidate.id.slice(0, 8)} did`)
+      console.log(`  npm run feedback -- ${first.scored.candidate.id.slice(0, 8)} rated 5`)
+    }
+  } catch (err) {
+    if (err instanceof NoCandidatesError) {
+      console.log(`\n${err.message}`)
+      process.exitCode = 1
+      return
+    }
+    throw err
+  } finally {
+    store.close()
   }
-  store.close()
 }
 
 async function cmdFeedback(args: Args): Promise<void> {
@@ -405,15 +367,21 @@ async function main(): Promise<void> {
       console.log(`WeekendFun — parallel cloud browsers that plan your weekend.
 
   npm run plan -- "Tampa, FL"
-  npm run plan -- "Seattle, WA" --vibes "outdoorsy, cheap" --budget 150 --explain
-  npm run plan -- "Austin, TX" --ask "date night, no driving, under \\$100"
+  npm run plan -- "Seattle, WA" -- --vibes "outdoorsy, cheap" --budget 150
+  npm run plan -- "Austin, TX" -- --ask "date night, no driving, under \\$100"
   npm run feedback -- <candidate-id> did
   npm run history
   npm run sources
+  npm run dashboard              the browser UI: live fan-out, map, replays
   npm run geo-proof              prove the location targeting actually works
 
 Flags: --vibes --budget --adults --kids --mobility --avoid --days
-       --sources --concurrency --retries --explain --record --no-writeup`)
+       --sources --concurrency --retries --explain --record --no-writeup
+
+Note the SECOND \`--\` before any flag. npm parses the first batch after
+\`--\` as its own config and drops the flag names, so one dash silently
+runs with defaults. Without npm in the way, one is enough:
+  npx tsx src/cli.ts plan "Seattle, WA" --vibes "outdoorsy" --explain`)
   }
 }
 

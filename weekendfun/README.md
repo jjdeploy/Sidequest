@@ -7,7 +7,7 @@ Built on [Solari](https://getsolari.com).
 ```bash
 npm install
 cp .env.example .env      # add your SOLARI_API_KEY
-npm run plan -- "Tampa, FL" --vibes "chill, live music" --budget 220
+npm run plan -- "Tampa, FL" -- --vibes "chill, live music" --budget 220
 ```
 
 ```
@@ -125,12 +125,50 @@ to see it. Two real problems surfaced this way and neither was visible in Tampa:
 
 Boise went from 5/6 sources in 98s to 6/6 in 20s.
 
+## The dashboard
+
+```bash
+npm run dashboard        # http://localhost:5173
+```
+
+![The WeekendFun dashboard](docs/dashboard.jpg)
+
+Everything the CLI does, plus the three things that are much easier to see than
+to read:
+
+- **The fan-out on one clock.** A lane per browser on a shared time axis. The
+  striped head of each bar is the browser getting into position — launching,
+  then passing the geolocation gate — and the solid remainder is the source
+  actually reading a site. Staggered launches, a slow source's long tail and a
+  blown watchdog are all legible at a glance, next to the honest version of the
+  parallelism claim: this run's wall clock against the sum of the same work
+  done one source at a time.
+- **The plan as a map.** The stops in order, joined by the route, day two in
+  blue. It says how many stops have coordinates, because only Google Maps
+  publishes any and pretending otherwise would be a lie about the data.
+- **The replay.** Tick *record sessions* and every result gets a ▶ that plays
+  back the rrweb recording of the browser that found it — including the
+  geo-pinned URL it navigated to. That is the whole geolocation argument, on
+  video, from the session itself.
+
+Thumbs and stars write to the same SQLite store `npm run feedback` does, and
+the taste bars redraw as the weights move. "N sources agree" opens the evidence:
+one row per source with the text it actually returned.
+
+It's a `node:http` server, server-sent events, and one page of hand-written
+HTML — no framework, no bundler, no new dependency. `npm run dashboard` starts
+instantly and the repo still installs from two packages.
+
+It binds to `127.0.0.1` on purpose. It holds your API key, writes to your local
+store, and can spend money on your Solari account, and it has no auth: it's a
+control panel, not a deployable app.
+
 ## Ranking is deterministic and shows its working
 
 No model decides what goes in your weekend. Every score is named components you can read:
 
 ```bash
-npm run plan -- "Tampa, FL" --explain
+npm run plan -- "Tampa, FL" -- --explain
 ```
 
 ```
@@ -167,9 +205,10 @@ The taste vector is a handful of numbers in SQLite that you can print (`npm run 
 ## Commands
 
 ```bash
-npm run plan -- "Seattle, WA" --vibes "outdoorsy, cheap" --budget 150
-npm run plan -- "Austin, TX" --ask "date night, no driving, under $100"
-npm run plan -- "Tampa, FL" --explain --record
+npm run plan -- "Seattle, WA" -- --vibes "outdoorsy, cheap" --budget 150
+npm run plan -- "Austin, TX" -- --ask "date night, no driving, under $100"
+npm run plan -- "Tampa, FL" -- --explain --record
+npm run dashboard                     the browser UI: live fan-out, map, replays
 npm run feedback -- <candidate-id> <kept|skipped|did|rated> [1-5]
 npm run history
 npm run sources
@@ -180,19 +219,33 @@ npm run harden -- "Boise, ID"         ...or ones you choose
 
 Flags: `--vibes --budget --adults --kids --mobility --avoid --days --sources --concurrency --retries --explain --record --no-writeup`
 
+**Note the second `--` before any flag.** npm parses the first batch after
+`--` as its own config and drops the flag names, so a single dash quietly
+runs with defaults. The CLI detects that and tells you. Without npm in the
+way one dash is enough: `npx tsx src/cli.ts plan "Tampa, FL" --explain`.
+
 ## Claude is optional, and only at the edges
 
 `--ask` parses a free-text request, and a write-up turns the finished plan into prose. Both shell out to the `claude` CLI in headless mode, which works on a Pro/Max subscription **with no API key** — so cloning this needs exactly one secret.
 
 Ranking, itinerary assembly and learning are all deterministic code. An LLM in the ranking path would make results unreproducible and learning unmeasurable. If `claude` isn't installed, you lose prose and keep the plan.
 
-## Four things that cost an afternoon
+## Five things that cost an afternoon
 
 Kept here because the Solari cookbook asks for exactly this, and each one produced a plausible-looking wrong answer rather than an error.
 
 - **`waitForSelector` is not bounded by its own timeout.** With `{ timeout: 6_000 }` on a busy SPA it took **65 seconds** — its polling can't get scheduled on a saturated page. It ate the entire source budget while logging nothing. A bounded `waitForTimeout` plus a direct query is both faster and honest; `evaluateAll` on a missing selector returns `[]`, which is the right answer for "no events" anyway.
 - **`waitUntil: "domcontentloaded"` never settles** on sites with a long resource tail. `"commit"` returns in ~1s, and a bounded wait afterwards is enough. 110s hang → 7s.
 - **`closest("section")` can match the entire results container**, so `textContent` returns the whole document. Twenty of those through a greedy `[^•]*` regex wedges the page's JS thread.
+- **`npm run x -- --flag value` does not pass the flag.** npm 11 parses what
+  follows `--` as its own config: it records `--sources timeout` as a boolean
+  config named `sources`, drops the flag name from argv, and leaves `timeout`
+  behind as a stray positional. So `npm run plan -- "Tampa, FL" --sources
+  timeout --budget 150` ran a full six-source plan on the default budget and
+  reported nothing wrong. A second `--` fixes it. The values are unrecoverable
+  by then (npm stored `true`, not `timeout`), but the leftover `npm_config_*`
+  variables make the case exactly detectable, so the CLI now says so instead
+  of quietly doing the wrong thing.
 - **`toISOString()` shifts the date.** Building a local `Date`, adding days, then slicing the ISO string planned Sunday and Monday for a request made on a Monday in Florida. Do the arithmetic on Y/M/D integers via `Date.UTC`.
 
 ## Layout
