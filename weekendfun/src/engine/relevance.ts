@@ -37,6 +37,7 @@
 import type { Candidate, Place, PlanRequest } from "../types.js"
 import { milesBetween } from "../sources/util.js"
 import { isJunkEvent } from "../sources/util.js"
+import { isDegenerate } from "../sources/text.js"
 import { eventDateOf, prettyDate } from "../sources/when.js"
 
 export type Dimension = "place" | "time" | "kind"
@@ -186,6 +187,15 @@ function checkTime(c: Candidate, ctx: ScreenContext): Finding {
 // ──────────────────────────────────────────────────────────────────── kind
 
 function checkKind(c: Candidate): Finding {
+  // An extraction that produced two characters is not a venue. cleanField
+  // already recognises these, but buildCandidate has to return SOMETHING, so
+  // it falls back to the raw title and a card reading "Ba" reaches the plan.
+  // Rejecting is the gate's job, not the builder's.
+  if (isDegenerate(c.title)) {
+    return { dimension: "kind", state: "fail", fatal: true, points: -60,
+      why: `the title came back as "${c.title}" — the scrape didn't find a real name` }
+  }
+
   // This filter used to live inside two scrapers, so a networking seminar
   // from any other source sailed through. It is not about events; it is
   // about whether something is a way to spend a weekend.
