@@ -386,7 +386,7 @@ dashboard failed: ${err.message}
 // Solari account; it has no auth and is not meant to.
 server.listen(PORT, "127.0.0.1", () => {
   const key = process.env.SOLARI_API_KEY ? "found" : "MISSING — copy .env.example to .env"
-  console.log(`\nWeekendFun dashboard  →  http://localhost:${PORT}`)
+  console.log(`\nBearings dashboard  →  http://localhost:${PORT}`)
   console.log(`  store        ${DB_PATH}`)
   console.log(`  SOLARI_API_KEY ${key}`)
   console.log(`  reddit       ${redditConfigured() ? "configured" : "not configured (source will skip)"}`)

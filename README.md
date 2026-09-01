@@ -1,6 +1,8 @@
-# WeekendFun
+# Bearings
 
-**It's the weekend and you don't know this town yet.**
+**Get your bearings in a town you don't know yet.**
+
+*It's the weekend, you're new here, and you have no idea what's on.*
 
 What's on near you is split across a dozen sites and not one of them will sell you an API. Every attempt to unify local listings has died on exactly that — you'd have to convince every platform to cooperate.
 

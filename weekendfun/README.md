@@ -1,4 +1,4 @@
-# WeekendFun
+# Bearings
 
 **It's the weekend and you don't know this town yet.**
 

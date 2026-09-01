@@ -1,9 +1,9 @@
 {
-  "name": "weekendfun",
+  "name": "bearings",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Parallel geo-pinned cloud browsers that plan your weekend, and learn what you actually like.",
+  "description": "Real browsers, placed at your coordinates, reading every local listing at once. Get your bearings in a town you don't know yet.",
   "scripts": {
     "plan": "tsx --env-file-if-exists=.env src/cli.ts plan",
     "dashboard": "tsx --env-file-if-exists=.env src/web/server.ts",

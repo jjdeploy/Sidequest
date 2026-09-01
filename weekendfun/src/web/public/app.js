@@ -1,5 +1,5 @@
 /**
- * WeekendFun — client.
+ * Bearings — client.
  *
  * No framework and no build step, for the same reason the server has no
  * dependencies: the repo's promise is `npm install` and go. This is three
@@ -126,8 +126,21 @@ async function boot() {
     $("landingStats").textContent = s.counts.runs > 0
       ? `${s.counts.runs} weekends planned · ${s.counts.candidates.toLocaleString()} places known so far`
       : "nothing planned here yet"
+
+    // Free text is parsed by the claude CLI, so say up front when it isn't
+    // installed rather than after someone has typed a sentence into a dead
+    // field. The mood chips work either way.
+    const ask = $("ask")
+    const hint = $("askHint")
+    if (s.claude) {
+      hint.textContent = "optional"
+    } else {
+      ask.disabled = true
+      ask.placeholder = "install the claude CLI to use this"
+      hint.textContent = "needs the claude CLI"
+    }
   } catch {
-    showError("Can't reach the WeekendFun server. Is `npm run dashboard` still running?")
+    showError("Can't reach the Bearings server. Is `npm run dashboard` still running?")
   }
 }
 
@@ -185,6 +198,10 @@ function start() {
   const q = new URLSearchParams({
     city, vibes: [...state.moods].join(","), budget: "300", record: "1",
   })
+  // Free text layers ON TOP of the chips rather than replacing them — asking
+  // for "date night" and also ticking "keep it cheap" should give you both.
+  const ask = $("ask").value.trim()
+  if (ask) q.set("ask", ask)
 
   state.running = true
   state.t0 = performance.now()
@@ -247,6 +264,9 @@ function onPlace(e) {
   $("statusPlace").textContent = e.place.label
   $("statusCoords").textContent = `${e.place.lat.toFixed(4)}, ${e.place.lng.toFixed(4)}`
   renderHere(e.place)
+  // What the model made of the free text, shown before the results so a
+  // misreading is visible while it still explains the plan.
+  state.askNote = e.askNote
 }
 
 function onKeywords(keywords) {
@@ -379,7 +399,9 @@ function onItinerary(it) {
 function renderPlan(it) {
   const host = $("days")
   clear(host)
-  $("planMeta").textContent = state.place ? state.place.label : ""
+  $("planMeta").textContent = state.askNote
+    ? `read as: ${state.askNote}`
+    : state.place ? state.place.label : ""
 
   let pin = 0
   const pins = []
@@ -784,7 +806,7 @@ function closeModal() {
 function showAbout() {
   openModal("How this works", el("div", {}, [
     el("p", {}, "What's on near you is spread across a dozen sites, and none of them will sell you an API. Every attempt to unify local listings has died on exactly that — you'd have to convince every platform to cooperate."),
-    el("p", {}, "So WeekendFun doesn't ask. It opens real browsers in the cloud, stands them at your coordinates, and reads every source at the same time. A browser is a permissionless interface: if a site has a page, it can be read."),
+    el("p", {}, "So Bearings doesn't ask. It opens real browsers in the cloud, stands them at your coordinates, and reads every source at the same time. A browser is a permissionless interface: if a site has a page, it can be read."),
     el("h4", {}, "Why standing there matters"),
     el("p", {}, "The web personalises on where your traffic comes from and what you've clicked before. If you've just moved, both of those are wrong, so it keeps showing you your old life. Every browser here proves where it is before it's allowed to search — which is also why you can plan a weekend in a city you haven't moved to yet."),
     el("h4", {}, "What decides the plan"),

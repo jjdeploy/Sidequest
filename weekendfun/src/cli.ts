@@ -1,5 +1,5 @@
 /**
- * WeekendFun CLI.
+ * Bearings CLI.
  *
  *   npm run plan -- "Tampa, FL" --vibes "chill, live music" --budget 200
  *   npm run plan -- "Seattle, WA" --ask "cheap date night, no driving"
@@ -195,7 +195,7 @@ async function cmdPlan(args: Args): Promise<void> {
   })
 
   console.log(`\n${BAR}`)
-  console.log(`WeekendFun — ${req.place.label}`)
+  console.log(`Bearings — ${req.place.label}`)
   console.log(BAR)
   if (alternates.length > 0) {
     console.log(`(also matched ${alternates.map((a) => a.label).join(", ")} — qualify the name to pick another)`)
@@ -381,7 +381,7 @@ async function main(): Promise<void> {
       cmdSources()
       break
     default:
-      console.log(`WeekendFun — parallel cloud browsers that plan your weekend.
+      console.log(`Bearings — parallel cloud browsers that plan your weekend.
 
   npm run plan -- "Tampa, FL"
   npm run plan -- "Seattle, WA" -- --vibes "outdoorsy, cheap" --budget 150

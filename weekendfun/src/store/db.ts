@@ -1,5 +1,5 @@
 /**
- * The memory. This is what makes WeekendFun a planner rather than a scraper.
+ * The memory. This is what makes Bearings a planner rather than a scraper.
  *
  * Uses `node:sqlite`, which is built into Node 22 — no native module, no
  * build step, nothing for a reviewer to install before the repo runs.

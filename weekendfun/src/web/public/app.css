@@ -102,11 +102,8 @@ body[data-screen="landing"] .screen--landing { display: flex; }
   display: inline-flex; align-items: center; gap: var(--s2);
   background: none; border: 0; padding: var(--s1) 0; cursor: pointer;
 }
-.brand-mark {
-  width: 16px; height: 16px; border-radius: 5px; flex: none;
-  background: linear-gradient(135deg, var(--mango), var(--coral));
-}
-.brand-name { font-family: var(--display); font-weight: 800; font-size: 15.5px; letter-spacing: -0.03em; }
+.brand-mark { width: 20px; height: 20px; flex: none; display: block; }
+.brand-name { font-family: var(--display); font-weight: 800; font-size: 16.5px; letter-spacing: -0.03em; }
 
 /* The middle slot: empty on the landing page, the current position after. */
 .topbar-mid { justify-self: center; min-width: 0; }
@@ -159,7 +156,17 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 @keyframes drift-c { to { transform: translate(-10%, 12%) scale(1.12); } }
 @keyframes drift-d { to { transform: translate(12%, -10%) scale(1.1); } }
 
-.hero { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; justify-content: center; padding: var(--s8) 0 var(--s7); max-width: 1120px; }
+/* Two columns. The single left column with an empty half-page beside it read
+   as unfinished, and cramming everything into it made the form feel like a
+   footnote. The right side carries the argument — what it reads and why —
+   which is real content rather than something to fill a gap with. */
+.hero {
+  position: relative; z-index: 1; flex: 1;
+  display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr);
+  align-items: center; gap: var(--s8);
+  padding: var(--s8) 0; max-width: 1240px; width: 100%; margin: 0 auto;
+}
+.hero-copy { min-width: 0; max-width: 620px; }
 
 .badge {
   display: inline-flex; align-items: center; gap: var(--s2); align-self: flex-start;
@@ -177,9 +184,9 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(13,148,136,.05); } }
 
 .hero-line {
-  font-size: clamp(40px, 7vw, 86px);
-  line-height: .95; font-weight: 800; letter-spacing: -0.045em;
-  margin-bottom: var(--s5);
+  font-size: clamp(38px, 4.6vw, 62px);
+  line-height: 1.0; font-weight: 800; letter-spacing: -0.04em;
+  margin-bottom: var(--s4);
 }
 .hero-line span { display: block; animation: riseIn .6s cubic-bezier(.2,.8,.25,1) backwards; }
 .hero-line span:nth-child(1) { animation-delay: .06s; }
@@ -187,36 +194,37 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 .hero-line span:nth-child(3) { color: var(--coral); animation-delay: .22s; }
 @keyframes riseIn { from { opacity: 0; transform: translateY(14px); } }
 
-.hero-sub { max-width: 52ch; color: var(--muted); font-size: clamp(15.5px, 1.6vw, 17.5px); margin: 0 0 var(--s6); }
+.hero-sub { max-width: 50ch; color: var(--muted); font-size: 16px; margin: 0 0 var(--s6); }
 
-.ask { max-width: 780px; }
-.ask-row { display: flex; gap: var(--s2); align-items: flex-end; flex-wrap: wrap; }
-.ask-field { flex: 1 1 300px; display: flex; flex-direction: column; gap: var(--s2); }
+.ask { display: flex; flex-direction: column; gap: var(--s4); }
+.field { display: flex; flex-direction: column; gap: var(--s2); min-width: 0; }
 
 .ask input {
   width: 100%; background: var(--card);
   border: 1px solid var(--rule-2); border-radius: var(--r-md);
-  color: var(--ink); font-family: var(--display); font-weight: 700;
-  font-size: clamp(19px, 2.4vw, 24px); letter-spacing: -0.025em;
-  padding: 14px 16px;
+  color: var(--ink); font-size: 16px;
+  padding: 13px 15px;
   transition: border-color .16s, box-shadow .16s;
   box-shadow: var(--shadow);
 }
+#city { font-family: var(--display); font-weight: 700; font-size: 21px; letter-spacing: -0.025em; padding: 13px 16px; }
 .ask input:focus { outline: none; border-color: var(--coral); box-shadow: 0 0 0 3px rgba(244,85,44,.14); }
+.ask input:disabled { background: var(--sand); color: var(--faint); cursor: not-allowed; box-shadow: none; }
 .ask input::placeholder { color: #c8b4a2; }
 
 .go {
+  margin-top: var(--s1);
   border: 0; border-radius: var(--r-md); cursor: pointer;
   background: linear-gradient(135deg, var(--mango), var(--coral) 70%);
-  color: #fff; font-family: var(--body); font-weight: 650; font-size: 15.5px;
-  padding: 16px 26px; white-space: nowrap;
+  color: #fff; font-family: var(--body); font-weight: 650; font-size: 16px;
+  padding: 15px 26px; white-space: nowrap;
+  display: flex; align-items: baseline; justify-content: center; gap: var(--s2);
   transition: transform .14s, box-shadow .14s, opacity .14s;
-  box-shadow: 0 6px 18px -8px rgba(244,85,44,.7);
+  box-shadow: 0 8px 20px -8px rgba(244,85,44,.65);
 }
-.go:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 24px -8px rgba(244,85,44,.75); }
+.go:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 26px -8px rgba(244,85,44,.7); }
 .go:disabled { opacity: .5; cursor: progress; box-shadow: none; }
-
-.moods { margin-top: var(--s5); display: flex; flex-direction: column; gap: var(--s2); }
+.go-sub { font: 400 12.5px var(--mono); opacity: .8; }
 .chips { display: flex; flex-wrap: wrap; gap: var(--s1); }
 .chip {
   border: 1px solid var(--rule-2); background: var(--card); color: var(--muted);
@@ -231,21 +239,42 @@ body[data-screen="landing"] .screen--landing { display: flex; }
   background: #fff1f3; border: 1px solid #ffcdd6; color: #9e2743; max-width: 62ch;
 }
 
+.hero-side { min-width: 0; }
+.side-card {
+  background: rgba(255,255,255,.82); backdrop-filter: blur(10px);
+  border: 1px solid var(--rule); border-radius: var(--r-lg);
+  padding: var(--s5); box-shadow: var(--shadow-lift);
+}
+.side-head { display: flex; align-items: baseline; gap: var(--s3); padding-bottom: var(--s3); border-bottom: 1px solid var(--rule); }
+.side-count { margin-left: auto; font: 400 11.5px var(--mono); color: var(--faint); }
+.side-list { list-style: none; margin: 0; padding: var(--s2) 0 0; display: flex; flex-direction: column; }
+.side-list li { display: flex; align-items: baseline; gap: var(--s3); padding: 9px 0; border-bottom: 1px solid var(--rule); }
+.side-list li:last-child { border-bottom: 0; }
+.side-list b { font-weight: 600; font-size: 13.5px; flex: none; width: 104px; letter-spacing: -0.01em; }
+.side-list span { font-size: 13px; color: var(--muted); }
+.side-foot {
+  display: flex; align-items: flex-start; gap: var(--s2);
+  margin-top: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--rule);
+  font-size: 12.5px; color: var(--muted);
+}
+.side-pin { width: 7px; height: 7px; border-radius: 50%; background: var(--sea); flex: none; margin-top: 6px; box-shadow: 0 0 0 3px rgba(13,148,136,.15); }
+
 /* Three claims, not a paragraph. */
 .pitch {
   position: relative; z-index: 1;
-  list-style: none; margin: var(--s8) 0 0; padding: var(--s5) 0 0;
+  list-style: none; margin: 0; padding: var(--s6) 0 0;
   border-top: 1px solid var(--rule);
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--s5);
-  max-width: 900px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--s6);
+  max-width: 1240px; width: 100%; margin: 0 auto;
 }
-.pitch li { font-size: 13.5px; color: var(--muted); }
-.pitch b { display: block; color: var(--ink); font-weight: 650; font-size: 14.5px; margin-bottom: 2px; letter-spacing: -0.01em; }
+.pitch li { font-size: 13.5px; color: var(--muted); max-width: 42ch; }
+.pitch b { display: block; color: var(--ink); font-weight: 650; font-size: 15px; margin-bottom: var(--s1); letter-spacing: -0.015em; }
 
 .landing-foot {
   position: relative; z-index: 1;
-  padding: var(--s5) 0; margin-top: var(--s6); border-top: 1px solid var(--rule);
+  padding: var(--s5) 0 var(--s6); margin-top: var(--s7);
   font: 400 11px var(--mono); color: var(--faint); letter-spacing: .08em;
+  max-width: 1240px; width: 100%; margin-inline: auto;
 }
 
 /* ═══════════════════════════════════════════════════════════════ working */
@@ -472,6 +501,13 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 
 /* ═══════════════════════════════════════════════════════════ responsive */
 
+@media (max-width: 1080px) {
+  /* Below this the two columns start fighting. Stack them, and let the
+     source card follow the form rather than sit beside a squeezed one. */
+  .hero { grid-template-columns: 1fr; gap: var(--s6); align-items: start; padding: var(--s7) 0; }
+  .hero-copy { max-width: 640px; }
+  .hero-side { max-width: 640px; }
+}
 @media (max-width: 860px) {
   .topbar { grid-template-columns: auto 1fr auto; }
   .here-coords { display: none; }
