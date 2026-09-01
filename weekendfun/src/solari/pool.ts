@@ -43,6 +43,24 @@ export interface SourceTask {
    *  than blanket-on. Requires stealth, which the pool always sets. */
   captcha?: boolean
   /**
+   * Split this source's work across several browsers.
+   *
+   * Google Maps is the only source that loops over queries — one navigation
+   * per keyword, in sequence, in a single browser. That made it the long pole
+   * by construction: every other source does one or two page loads, so the
+   * fan-out's wall clock was Maps' keyword count times a page load, and a
+   * Palm Coast run spent 90 seconds there and returned nothing.
+   *
+   * The Starter plan allows twenty concurrent browsers and we were using six.
+   * A task that returns shards here gets one browser per shard, each with its
+   * own geo gate, running at the same time as everything else; the results
+   * merge back under one source id. Sources that do a single page load return
+   * nothing and stay as they are — sharding them would spend browser slots to
+   * save nothing.
+   */
+  shard?: (keywords: Keyword[]) => Keyword[][]
+
+  /**
    * Override the pool's watchdog for this source.
    *
    * Worth setting wherever a source's healthy time is well known: the fan-out
@@ -76,6 +94,28 @@ export interface PoolOptions {
   sourceTimeoutMs?: number
   /** Gap between successive source launches, to avoid a thundering herd. */
   staggerMs?: number
+  /**
+   * Stored browser profile (cookies + localStorage) to attach to every
+   * browser in this fan-out.
+   *
+   * One per city. Cookie banners get accepted once instead of on every
+   * browser on every run, the location these sites keep in their own cookies
+   * agrees with the geolocation override instead of being negotiated fresh,
+   * and a browser with history is less obviously a robot — which matters for
+   * the sources that already block us.
+   */
+  profileId?: string
+  /**
+   * Hard ceiling on the WHOLE fan-out, not one source.
+   *
+   * Sources run in parallel, so the plan finishes when the slowest one does,
+   * and any single source can hang: measured, Groupon has taken 93s and
+   * Google Maps 90s on the same city that otherwise finishes in 21. No amount
+   * of per-source tuning gets a reliable answer under half a minute while
+   * that is true. This stops waiting and lets the plan be built from whatever
+   * arrived, with the stragglers named rather than silently absent.
+   */
+  deadlineMs?: number
   onEvent?: (e: PoolEvent) => void
 }
 
@@ -112,6 +152,8 @@ export class BrowserPool {
   private readonly retries: number
   private readonly sourceTimeoutMs: number
   private readonly staggerMs: number
+  private readonly profileId?: string
+  private readonly deadlineMs: number
   private readonly onEvent?: (e: PoolEvent) => void
   /**
    * Run id, combined with the source name to make a PER-SOURCE sticky IP.
@@ -128,14 +170,31 @@ export class BrowserPool {
   private readonly runId = `wf-${Date.now().toString(36)}`
   private active = 0
   private readonly waiting: Array<() => void> = []
+  /**
+   * Browsers currently open.
+   *
+   * The deadline is worthless without this. Stopping waiting on a promise
+   * does not stop the work behind it: the first version returned at 20s and
+   * then blocked for another 50 in `close()`, because six browsers were
+   * still mid-navigation and the session teardown waits for them. Closing a
+   * session rejects whatever it was doing, which is what makes the abandoned
+   * work actually stop.
+   */
+  private readonly live = new Set<BrowserSession>()
 
   constructor(opts: PoolOptions) {
     this.solari = new Solari({ apiKey: opts.apiKey })
     this.maxConcurrent = Math.max(1, Math.min(20, opts.maxConcurrent ?? 12))
     this.recording = opts.recording ?? false
-    this.retries = opts.retries ?? 1
+    // Zero by default now that a global deadline exists. A retry costs the
+    // same wall clock again for the same answer, and under a 20s budget it
+    // can never land: Time Out spent 70 seconds on one 30s attempt plus one
+    // 30s retry, and contributed nothing either time.
+    this.retries = opts.retries ?? 0
     this.sourceTimeoutMs = opts.sourceTimeoutMs ?? 90_000
     this.staggerMs = opts.staggerMs ?? 400
+    this.profileId = opts.profileId
+    this.deadlineMs = opts.deadlineMs ?? 20_000
     this.onEvent = opts.onEvent
   }
 
@@ -172,11 +231,77 @@ export class BrowserPool {
     keywords: Keyword[],
     req: PlanRequest,
   ): Promise<SourceResult[]> {
-    return Promise.all(
-      tasks.map(async (t, i) => {
-        if (i > 0) await sleep(i * this.staggerMs)
-        return this.runOne(t, place, keywords, req)
-      }),
+    // Expand each task into the browsers it actually wants. A source that
+    // declares `shard` becomes several units of work under one source id.
+    const units: Array<{ task: SourceTask; keywords: Keyword[] }> = []
+    for (const task of tasks) {
+      const shards = task.shard?.(keywords)
+      if (shards && shards.length > 0) {
+        for (const slice of shards) if (slice.length > 0) units.push({ task, keywords: slice })
+      } else {
+        units.push({ task, keywords })
+      }
+    }
+
+    const started = Date.now()
+    const partial = new Map<SourceId, SourceResult>()
+    const record = (r: SourceResult) => {
+      const prior = partial.get(r.source)
+      partial.set(
+        r.source,
+        prior
+          ? {
+              source: r.source,
+              candidates: [...prior.candidates, ...r.candidates],
+              elapsedMs: Math.max(prior.elapsedMs, r.elapsedMs),
+              sessionId: prior.sessionId ?? r.sessionId,
+              // A source only counts as failed when every one of its shards
+              // did. One slow Maps query shouldn't blank the other five.
+              error: prior.candidates.length + r.candidates.length > 0
+                ? undefined
+                : (prior.error ?? r.error),
+            }
+          : r,
+      )
+    }
+
+    // Results are recorded as they land, so the deadline can take whatever
+    // has arrived rather than losing everything to one straggler.
+    const running = units.map(async (u, i) => {
+      if (i > 0) await sleep(i * this.staggerMs)
+      record(await this.runOne(u.task, place, u.keywords, req, i))
+    })
+
+    const timedOut = await Promise.race([
+      Promise.all(running).then(() => false),
+      sleep(this.deadlineMs).then(() => true),
+    ])
+
+    if (timedOut) {
+      // Stop the work, not just the waiting.
+      this.abandon()
+      for (const task of tasks) {
+        if (!partial.has(task.id)) {
+          this.emit({ type: "fail", source: task.id, reason: `no answer within ${this.deadlineMs}ms` })
+          partial.set(task.id, {
+            source: task.id,
+            candidates: [],
+            elapsedMs: Date.now() - started,
+            error: `missed the ${(this.deadlineMs / 1000).toFixed(0)}s deadline`,
+          })
+        }
+      }
+    }
+
+    // Preserve the caller's source order, so logs and the gantt stay stable.
+    return tasks.map(
+      (t) =>
+        partial.get(t.id) ?? {
+          source: t.id,
+          candidates: [],
+          elapsedMs: Date.now() - started,
+          error: "never started",
+        },
     )
   }
 
@@ -185,6 +310,8 @@ export class BrowserPool {
     place: Place,
     keywords: Keyword[],
     req: PlanRequest,
+    /** Distinguishes shards of the same source, so each gets its own IP. */
+    unit = 0,
   ): Promise<SourceResult> {
     const started = Date.now()
     const attempts = this.retries + 1
@@ -193,7 +320,11 @@ export class BrowserPool {
       await this.acquire()
       let browser: BrowserSession | undefined
       try {
-        const proxy = proxyFor(place, `${this.runId}-${task.id}`)
+        // Sticky per UNIT, not per source. Eight Google Maps shards sharing
+        // one sticky id meant eight simultaneous searches from a single
+        // residential IP — the exact throttling this stickiness was
+        // introduced to avoid, just moved one level down.
+        const proxy = proxyFor(place, `${this.runId}-${task.id}-${unit}`)
         const launch: LaunchOptions = {
           // `proxy` and `captcha` both REQUIRE stealth — a proxied request from
           // an obviously-automated browser is the pairing that gets blocked.
@@ -201,10 +332,12 @@ export class BrowserPool {
           proxy,
           captcha: task.captcha ?? false,
           recording: this.recording,
+          profileId: this.profileId,
         }
         this.emit({ type: "launch", source: task.id, proxy: describeProxy(proxy) })
 
         browser = await this.solari.launch(launch)
+        this.live.add(browser)
         const sessionId = browser.id
 
         // The gate. Throws GeoGateError if the page won't confirm where it is.
@@ -253,12 +386,27 @@ export class BrowserPool {
       } finally {
         // close() releases the session too. Skipping it holds the slot until
         // the plan deadline and starves everything still queued.
-        if (browser) await browser.close().catch(() => {})
+        if (browser) {
+          this.live.delete(browser)
+          await browser.close().catch(() => {})
+        }
         this.release()
       }
     }
 
     return { source: task.id, candidates: [], elapsedMs: Date.now() - started, error: "no attempts" }
+  }
+
+  /**
+   * Close every browser still open, without waiting for its work.
+   *
+   * Called when the fan-out deadline fires. Each abandoned `runOne` then
+   * fails fast on its own rejected navigation and unwinds, so `close()`
+   * returns promptly instead of inheriting the slowest source's tail.
+   */
+  private abandon(): void {
+    for (const browser of this.live) void browser.close().catch(() => {})
+    this.live.clear()
   }
 
   /** REQUIRED. The client holds a loopback proxy open for connection retries,

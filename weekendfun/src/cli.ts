@@ -219,7 +219,9 @@ async function cmdPlan(args: Args): Promise<void> {
         if (e.keywords.length > 6) console.log(`  · …and ${e.keywords.length - 6} more`)
         break
       case "launching":
-        console.log(`\nLaunching ${e.sources.length} cloud browsers in parallel:`)
+        console.log(
+          `\nLaunching ${e.browsers} cloud browsers across ${e.sources.length} sources, in parallel:`,
+        )
         break
       case "pool":
         renderProgress(e.event)
@@ -263,7 +265,9 @@ async function cmdPlan(args: Args): Promise<void> {
         apiKey,
         sources: list(args, "sources"),
         concurrency: num(args, "concurrency", 12),
-        retries: num(args, "retries", 1),
+        // Zero: a retry cannot land inside the global deadline, it just burns
+        // the slot twice. The deadline is the resilience mechanism now.
+        retries: num(args, "retries", 0),
         sourceTimeoutMs: num(args, "source-timeout", 90) * 1000,
         keywordLimit: num(args, "keywords", 8),
         record: bool(args, "record"),

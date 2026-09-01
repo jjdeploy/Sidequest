@@ -164,7 +164,9 @@ function buildSourceChips() {
 
 function updateGoSub() {
   const n = state.pickedSources.size
-  $("goSub").textContent = `${n} browser${n === 1 ? "" : "s"} in parallel`
+  // Maps takes one browser per keyword, so the real count is higher than the
+  // number of sources; the exact figure arrives with the launching event.
+  $("goSub").textContent = `${n} source${n === 1 ? "" : "s"}, in parallel`
 }
 
 function wireForm() {

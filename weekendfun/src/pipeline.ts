@@ -141,7 +141,7 @@ export type PlanEvent =
   | { type: "place"; place: Place; alternates: Place[]; askNote: string | null }
   | { type: "request"; req: PlanRequest }
   | { type: "keywords"; keywords: Keyword[] }
-  | { type: "launching"; sources: string[]; concurrency: number; recording: boolean }
+  | { type: "launching"; sources: string[]; browsers: number; concurrency: number; recording: boolean }
   | { type: "pool"; at: number; event: PoolEvent }
   | { type: "reddit"; found: number; configured: boolean }
   | { type: "weather"; weather: Weather[] }
@@ -236,6 +236,11 @@ export interface PlanOptions {
   concurrency?: number
   retries?: number
   sourceTimeoutMs?: number
+  staggerMs?: number
+  /** Hard ceiling on the whole fan-out. Partial results are normal. */
+  deadlineMs?: number
+  /** Stored browser profile, one per city. */
+  profileId?: string
   keywordLimit?: number
   /** rrweb session recording. Costs nothing extra to run, and it's what makes
    *  the replay links on the dashboard work. */
@@ -289,10 +294,14 @@ export async function runPlan(
   // 2. Fan out.
   const sources = sourcesByName(opts.sources ?? [])
   const recording = opts.record ?? false
+  // Google Maps takes one browser per keyword, so the count of browsers is
+  // no longer the count of sources.
+  const browserCount = sources.reduce((n, s) => n + (s.shard?.(keywords)?.length || 1), 0)
   emit({
     type: "launching",
     sources: sources.map((s) => s.id),
-    concurrency: opts.concurrency ?? 12,
+    browsers: browserCount,
+    concurrency: opts.concurrency ?? 18,
     recording,
   })
 
@@ -300,10 +309,22 @@ export async function runPlan(
   const started = Date.now()
   const pool = new BrowserPool({
     apiKey: opts.apiKey,
-    maxConcurrent: opts.concurrency ?? 12,
+    // Google Maps now takes one browser per keyword, so a full fan-out is
+    // ~13 browsers rather than 6. The Starter plan allows 20.
+    maxConcurrent: opts.concurrency ?? 18,
     recording,
-    retries: opts.retries ?? 1,
-    sourceTimeoutMs: opts.sourceTimeoutMs ?? 90_000,
+    retries: opts.retries ?? 0,
+    // Kept just under the global deadline: a source that hasn't answered by
+    // then cannot contribute, so it may as well free its slot.
+    sourceTimeoutMs: opts.sourceTimeoutMs ?? 18_000,
+    // 13 units at the old 400ms gap spent five seconds staggering before the
+    // last one even launched, which is a quarter of the whole budget.
+    staggerMs: opts.staggerMs ?? 150,
+    deadlineMs: opts.deadlineMs ?? 20_000,
+    // One profile per city: cookie banners get accepted once rather than on
+    // every browser on every run, and the location these sites keep in their
+    // own cookies ends up agreeing with the geolocation override.
+    profileId: opts.profileId,
     onEvent: (event) => emit({ type: "pool", at: Date.now() - started, event }),
   })
 
