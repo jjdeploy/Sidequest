@@ -126,6 +126,16 @@ const isConcurrencyLimit = (e: unknown) =>
 
 const reasonOf = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
+/**
+ * Did this fail because the proxy tunnel wouldn't open?
+ *
+ * Distinct from "the site blocked us" and worth telling apart, because the
+ * response is different: a blocked site is that source's problem, a dead
+ * tunnel is every source's problem and is survivable.
+ */
+const isProxyFailure = (e: unknown) =>
+  /ERR_TUNNEL_CONNECTION_FAILED|ERR_PROXY_CONNECTION_FAILED|ERR_SOCKS_CONNECTION_FAILED/i.test(reasonOf(e))
+
 class SourceTimeout extends Error {}
 
 /** Race a promise against a deadline. The loser keeps running — we can't
@@ -316,6 +326,7 @@ export class BrowserPool {
     const started = Date.now()
     const attempts = this.retries + 1
 
+    let usedProxy = true
     for (let attempt = 1; attempt <= attempts; attempt++) {
       await this.acquire()
       let browser: BrowserSession | undefined
@@ -338,15 +349,35 @@ export class BrowserPool {
 
         browser = await this.solari.launch(launch)
         this.live.add(browser)
-        const sessionId = browser.id
+        let sessionId = browser.id
 
         // The gate. Throws GeoGateError if the page won't confirm where it is.
         // Deadlined too: a hung gate is just as blocking as a hung scrape.
-        const ctx = await withDeadline(
-          openLocalContext(browser, place),
-          30_000,
-          `${task.id} geo gate`,
-        )
+        let ctx
+        try {
+          ctx = await withDeadline(openLocalContext(browser, place), 30_000, `${task.id} geo gate`)
+        } catch (err) {
+          // The residential proxy going down should not take the whole plan
+          // with it. This repo's central finding is that the proxy is NOT what
+          // localises us — the geolocation override is — so a browser with no
+          // proxy is still standing in the right city. What we lose is the
+          // sources that block datacenter egress, notably Groupon.
+          //
+          // Measured the day this was written: a plain launch reached
+          // example.com in 1.5s while every proxied tunnel failed. Without
+          // this, that produced six lanes of "no answer" and no plan at all.
+          if (!isProxyFailure(err) || !launch.proxy) throw err
+
+          this.emit({ type: "note", source: task.id, msg: "proxy tunnel failed — retrying on direct egress" })
+          this.live.delete(browser)
+          await browser.close().catch(() => {})
+
+          browser = await this.solari.launch({ ...launch, proxy: undefined })
+          this.live.add(browser)
+          sessionId = browser.id
+          usedProxy = false
+          ctx = await withDeadline(openLocalContext(browser, place), 30_000, `${task.id} geo gate`)
+        }
         this.emit({ type: "gated", source: task.id, sessionId, ms: Date.now() - started })
 
         const candidates = (
@@ -366,7 +397,7 @@ export class BrowserPool {
 
         const elapsedMs = Date.now() - started
         this.emit({ type: "done", source: task.id, found: candidates.length, ms: elapsedMs })
-        return { source: task.id, candidates, elapsedMs, sessionId }
+        return { source: task.id, candidates, elapsedMs, sessionId, direct: !usedProxy }
       } catch (err) {
         const reason = reasonOf(err)
         // Retrying a timeout just burns the same wall clock again for the same

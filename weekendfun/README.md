@@ -74,6 +74,24 @@ isn't enough on its own: the pool tracks live sessions and closes them when the
 deadline fires, because otherwise the run returns at 20s and then blocks for
 another 50 while abandoned browsers finish navigating.
 
+### When the proxy dies, the plan doesn't
+
+The residential proxy went down mid-build — every tunnel returning
+`ERR_TUNNEL_CONNECTION_FAILED` while a plain launch reached example.com in
+1.5s. Six lanes of "no answer" and no plan at all.
+
+That shouldn't happen, and the reason is the finding above: **the proxy isn't
+what localises us, the geolocation override is.** A browser with no proxy is
+still standing in the right city. So a failed tunnel now falls back to direct
+egress once, says so, and carries on:
+
+```
+12 of 12 in position · 100 candidates · 5/6 sources · 20.1s
+```
+
+What you lose is the sources that block datacenter traffic — Groupon, mainly.
+What you keep is the plan.
+
 ## Nothing searches until the browser proves where it is
 
 A context whose geolocation override silently failed still scrapes perfectly —

@@ -122,6 +122,11 @@ export interface SourceResult {
   /** Populated instead of candidates when the source failed. A failed source
    *  never fails the run — you get a thinner plan and a visible reason. */
   error?: string
+  /** True when the residential proxy was unavailable and this ran on direct
+   *  egress instead. Still geo-correct — the geolocation override is what
+   *  localises, not the proxy — but more visible to sites that block
+   *  datacenter traffic. */
+  direct?: boolean
 }
 
 export interface Weather {

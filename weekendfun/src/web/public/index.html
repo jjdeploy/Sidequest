@@ -6,27 +6,41 @@
 <title>WeekendFun</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/app.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🧭</text></svg>">
 </head>
 <body data-screen="landing">
 
+<!-- ═══════════════════════════════════════════════════════════════ header -->
+<!-- One header, every screen. The middle slot is the only part that changes:
+     empty on the landing page, the current location once there is one. -->
+<header class="topbar">
+  <button class="brand" id="brandHome" type="button" aria-label="WeekendFun — start again">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">WeekendFun</span>
+  </button>
+
+  <div class="topbar-mid" id="topbarMid"></div>
+
+  <nav class="topbar-nav">
+    <button class="nav-btn" id="aboutOpen" type="button">How it works</button>
+  </nav>
+</header>
+
 <!-- ══════════════════════════════════════════════════════════════ landing -->
 <section class="screen screen--landing" id="landing">
-  <!-- Sunset over water, four drifting blobs. CSS only — no WebGL, no
-       dependency, and it stops moving if the visitor asked it to. -->
   <div class="aurora" aria-hidden="true">
     <span class="aurora-a"></span><span class="aurora-b"></span>
     <span class="aurora-c"></span><span class="aurora-d"></span>
   </div>
 
-  <header class="mast">
-    <span class="wordmark">WeekendFun</span>
-    <button class="linkish" id="aboutOpen" type="button">How it works</button>
-  </header>
-
   <div class="hero">
+    <span class="badge">
+      <span class="badge-dot" aria-hidden="true"></span>
+      13 real browsers · placed at your coordinates
+    </span>
+
     <h1 class="hero-line">
       <span>It's the weekend</span>
       <span>and you don't know</span>
@@ -35,14 +49,14 @@
 
     <p class="hero-sub">
       What's on near you is scattered across a dozen sites and none of them will
-      sell you an API. So we open a browser in your city — actually in it, at
-      your coordinates — and read all of them at the same time.
+      sell you an API. So we open real browsers in your city — actually in it, at
+      your coordinates — and read all of them at once.
     </p>
 
     <form class="ask" id="planForm" autocomplete="off">
       <div class="ask-row">
         <label class="ask-field">
-          <span class="ask-label">Where are you?</span>
+          <span class="field-label">Your town</span>
           <input id="city" name="city" list="cityList" placeholder="Palm Coast, FL" required
                  autocapitalize="words" spellcheck="false">
           <datalist id="cityList">
@@ -55,88 +69,81 @@
       </div>
 
       <div class="moods">
-        <span class="moods-label">In the mood for anything in particular?</span>
+        <span class="field-label">In the mood for <em>optional</em></span>
         <div class="chips" id="moodChips"></div>
-        <span class="moods-hint">Skip it and we'll sweep the lot — food, parks, museums, bowling, live music.</span>
       </div>
 
       <p class="ask-error" id="formError" hidden></p>
     </form>
 
-    <div class="relocate">
-      <strong>Moving somewhere?</strong> Put the new city in. The browser stands
-      there, so the answers are that city's — not a guess made from here.
-    </div>
+    <ul class="pitch">
+      <li>
+        <b>Local, and provably so</b>
+        Every browser confirms where it is before it's allowed to search.
+      </li>
+      <li>
+        <b>Not there yet? Fine</b>
+        Put in a city you're moving to. The answers are that city's.
+      </li>
+      <li>
+        <b>Roughly 20 seconds</b>
+        Whatever hasn't answered by then is left behind, not waited for.
+      </li>
+    </ul>
   </div>
 
-  <footer class="landing-foot">
-    <span id="landingStats"></span>
-  </footer>
+  <footer class="landing-foot"><span id="landingStats"></span></footer>
 </section>
 
 <!-- ══════════════════════════════════════════════════════════════ working -->
 <section class="screen screen--working" id="working">
-  <div class="readout" id="readout">
-    <div class="readout-place" id="readoutPlace">locating…</div>
-    <div class="readout-coords" id="readoutCoords">—</div>
-    <div class="readout-state" id="readoutState">
-      <span id="readoutCount">0</span> browsers in position
-    </div>
-  </div>
-
   <div class="working-body">
+    <div class="status">
+      <span class="status-label">Searching from</span>
+      <span class="status-place" id="statusPlace">locating…</span>
+      <span class="status-sep" aria-hidden="true"></span>
+      <span class="status-coords" id="statusCoords">—</span>
+      <span class="status-ready"><b id="readyCount">0</b> of <span id="readyTotal">–</span> in position</span>
+    </div>
+
     <div class="terms" id="terms"></div>
     <div class="lanes" id="lanes"></div>
-    <p class="working-note">
-      Nothing searches until the page it opened confirms where it is. Whatever
-      hasn't answered in 20 seconds is left behind rather than kept waiting for.
+    <p class="hint">
+      Nothing searches until the page it opened confirms where it is.
     </p>
   </div>
 </section>
 
 <!-- ══════════════════════════════════════════════════════════════ results -->
 <section class="screen screen--results" id="results">
-  <header class="bar">
-    <button class="linkish" id="restart" type="button">← Somewhere else</button>
-    <div class="bar-coords" id="barCoords"></div>
-    <button class="linkish" id="aboutOpen2" type="button">How it works</button>
-  </header>
-
   <div class="wrap">
-    <!-- the plan -->
-    <section class="plan" id="plan">
-      <div class="eyebrow"><span>The plan</span><em id="planMeta"></em></div>
+    <section class="plan">
+      <div class="eyebrow"><span>Your weekend</span><em id="planMeta"></em></div>
       <div class="days" id="days"></div>
       <div class="plan-foot" id="planFoot"></div>
     </section>
 
-    <!-- the map -->
-    <section class="mapblock" id="mapblock">
+    <section class="mapblock">
       <div class="map" id="map"></div>
-      <p class="map-note" id="mapNote"></p>
+      <p class="hint" id="mapNote"></p>
     </section>
 
-    <!-- the write-up -->
     <section class="writeup" id="writeupBlock" hidden>
-      <div class="eyebrow"><span>Why this weekend</span></div>
+      <div class="eyebrow"><span>Why this one</span></div>
       <div id="writeup"></div>
     </section>
 
-    <!-- everything else -->
-    <section class="catalogue" id="catalogue">
-      <div class="eyebrow">
-        <span>Everything else here</span>
-        <em id="catCount"></em>
-      </div>
+    <section class="catalogue">
+      <div class="eyebrow"><span>Everything else here</span><em id="catCount"></em></div>
       <div class="filters" id="filters"></div>
       <div class="groups" id="groups"></div>
     </section>
 
-    <!-- engineering, one click deep -->
     <details class="rig" id="rig">
       <summary>
-        <span id="rigSummary">How this was found</span>
-        <span class="rig-more">show the machinery</span>
+        <span class="rig-title">How this was found</span>
+        <span class="rig-sum" id="rigSummary"></span>
+        <span class="rig-more">Details</span>
       </summary>
       <div class="rig-body">
         <div class="rig-stats" id="rigStats"></div>
@@ -149,8 +156,7 @@
       </div>
     </details>
 
-    <!-- taste -->
-    <section class="taste-block" id="tasteBlock">
+    <section class="taste-block">
       <div class="eyebrow"><span>What it's learned about you</span></div>
       <div class="taste" id="taste"></div>
     </section>

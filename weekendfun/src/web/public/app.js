@@ -96,6 +96,25 @@ const state = {
 
 const screen = (name) => { document.body.dataset.screen = name }
 
+/**
+ * The header's middle slot: where we are, or nothing.
+ *
+ * The place used to be a headline on the working screen and a centred string
+ * on the results bar — two treatments of one fact, and the loading screen
+ * ended up the loudest thing in the product. It lives here now, one compact
+ * chip, in the same position on every screen.
+ */
+function renderHere(place) {
+  const mid = $("topbarMid")
+  clear(mid)
+  if (!place) return
+  mid.append(el("div", { class: "here" }, [
+    el("span", { class: "here-pin" }),
+    el("span", { class: "here-name" }, place.label),
+    el("span", { class: "here-coords" }, `${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}`),
+  ]))
+}
+
 // ──────────────────────────────────────────────────────────────── boot
 
 async function boot() {
@@ -129,12 +148,18 @@ function buildMoods() {
 
 function wire() {
   $("planForm").addEventListener("submit", (e) => { e.preventDefault(); if (!state.running) start() })
-  $("restart").addEventListener("click", () => { screen("landing"); $("city").focus() })
+  // The wordmark is the way back. One header means one home button, rather
+  // than a different escape hatch on each screen.
+  $("brandHome").addEventListener("click", () => {
+    if (state.running) return
+    screen("landing")
+    $("city").focus()
+  })
   $("explainToggle").addEventListener("change", (e) => {
     state.explain = e.currentTarget.checked
     if (state.itinerary) renderPlan(state.itinerary)
   })
-  for (const id of ["aboutOpen", "aboutOpen2"]) $(id).addEventListener("click", showAbout)
+  $("aboutOpen").addEventListener("click", showAbout)
   $("modalClose").addEventListener("click", closeModal)
   $("modal").addEventListener("click", (e) => { if (e.target === $("modal")) closeModal() })
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal() })
@@ -171,9 +196,11 @@ function start() {
   $("writeupBlock").hidden = true
   $("formError").hidden = true
   $("go").disabled = true
-  $("readoutPlace").textContent = "locating…"
-  $("readoutCoords").textContent = "—"
-  $("readoutCount").textContent = "0"
+  $("statusPlace").textContent = "locating…"
+  $("statusCoords").textContent = "—"
+  $("readyCount").textContent = "0"
+  $("readyTotal").textContent = "–"
+  renderHere(null)
   screen("working")
 
   const stream = new EventSource(`/api/plan?${q}`)
@@ -217,9 +244,9 @@ function finish() {
 
 function onPlace(e) {
   state.place = e.place
-  $("readoutPlace").textContent = e.place.label
-  $("readoutCoords").textContent =
-    `${e.place.lat.toFixed(4)}, ${e.place.lng.toFixed(4)}  ·  ${e.place.timezone}`
+  $("statusPlace").textContent = e.place.label
+  $("statusCoords").textContent = `${e.place.lat.toFixed(4)}, ${e.place.lng.toFixed(4)}`
+  renderHere(e.place)
 }
 
 function onKeywords(keywords) {
@@ -236,6 +263,8 @@ function onKeywords(keywords) {
 
 function onLaunching(e) {
   state.recording = e.recording
+  // "8 of 13 in position" beats a bare count: it says how far through it is.
+  $("readyTotal").textContent = String(e.browsers ?? e.sources.length)
   const lanes = $("lanes")
   clear(lanes)
   for (const id of e.sources) {
@@ -287,7 +316,7 @@ function onPool(at, ev) {
       return
   }
   const gated = [...state.lanes.values()].reduce((n, l) => n + l.gated, 0)
-  $("readoutCount").textContent = String(gated)
+  $("readyCount").textContent = String(gated)
   draw()
 }
 
@@ -342,17 +371,6 @@ function onItinerary(it) {
   state.planned = new Set(it.days.flatMap((d) => d.items.map((i) => i.candidate.id)))
   screen("results")
   window.scrollTo(0, 0)
-
-  const bar = $("barCoords")
-  clear(bar)
-  if (state.place) {
-    bar.append(
-      el("b", {}, state.place.label),
-      " · ",
-      el("span", { class: "pin" }, `${state.place.lat.toFixed(4)}, ${state.place.lng.toFixed(4)}`),
-    )
-  }
-
   renderPlan(it)
   renderCatalogue()
   renderTaste(state.weights)
@@ -554,7 +572,7 @@ function renderRig() {
   const s = state.screened
   if (!g) return
 
-  $("rigSummary").textContent = `${g.of} sources · ${g.ok} answered · ${secs(g.elapsedMs)}`
+  $("rigSummary").textContent = `${g.ok} of ${g.of} sources · ${secs(g.elapsedMs)}`
 
   const stats = $("rigStats")
   clear(stats)
