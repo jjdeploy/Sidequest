@@ -1,0 +1,24 @@
+{
+  "name": "weekendfun",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Parallel geo-pinned cloud browsers that plan your weekend, and learn what you actually like.",
+  "scripts": {
+    "plan": "tsx src/cli.ts plan",
+    "sources": "tsx src/cli.ts sources",
+    "geo-proof": "tsx src/geo-proof.ts",
+    "feedback": "tsx src/cli.ts feedback",
+    "history": "tsx src/cli.ts history",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@solarisdk/browser": "^0.1.1",
+    "@solarisdk/sdk": "^0.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,91 +1,89 @@
-# Solari Cookbook
+# WeekendFun
 
-Short, runnable examples for [Solari](https://getsolari.com) — cloud browsers,
-sandboxes, and desktops behind one API key.
+**Twelve cloud browsers, in parallel, each one standing in your city, arguing about what you should do this weekend. Then it remembers what you actually liked.**
 
-Every example in this repo is a complete program you can run in under a minute.
-They are deliberately small: one idea each, no framework, no scaffolding to read
-past. Copy one into your project and change the parts you care about.
+Built on [Solari](https://getsolari.com) — a fork of the [Solari cookbook](https://github.com/solari-sdk/solari-cookbook) with a real application on top.
 
-## Examples
-
-### Cloud browser
-
-| Example | Language | What it shows |
-| --- | --- | --- |
-| [browser-quickstart-ts](examples/browser-quickstart-ts) | TypeScript | Launch a browser, open a page, read it |
-| [browser-quickstart-py](examples/browser-quickstart-py) | Python | Launch a browser, open a page, read it |
-| [browser-stealth-proxy-ts](examples/browser-stealth-proxy-ts) | TypeScript | Stealth mode + residential proxy egress |
-| [browser-profiles-ts](examples/browser-profiles-ts) | TypeScript | Log in once, reuse the session forever |
-| [browser-session-recording-py](examples/browser-session-recording-py) | Python | Record a session, download the replay |
-
-### Sandbox
-
-| Example | Language | What it shows |
-| --- | --- | --- |
-| [sandbox-quickstart-ts](examples/sandbox-quickstart-ts) | TypeScript | Run a command, write and read files |
-| [sandbox-code-interpreter-py](examples/sandbox-code-interpreter-py) | Python | Stateful Python kernel for agent loops |
-| [sandbox-port-preview-ts](examples/sandbox-port-preview-ts) | TypeScript | Expose a server in the VM on a public URL |
-
-### Desktop
-
-| Example | Language | What it shows |
-| --- | --- | --- |
-| [desktop-computer-use-py](examples/desktop-computer-use-py) | Python | Screenshot, click, and type on a Linux GUI |
-
-## Running an example
-
-Each directory is self-contained.
+### → [**`weekendfun/`**](weekendfun) — the project, and the full write-up
 
 ```bash
-git clone https://github.com/solari-sdk/solari-cookbook.git
-cd solari-cookbook/examples/browser-quickstart-ts
-
-npm install                          # or: pip install -r requirements.txt
-export SOLARI_API_KEY=slr_live_...   # grab one at console.getsolari.com
-npm start                            # or: python main.py
+cd weekendfun
+npm install
+cp .env.example .env      # add your SOLARI_API_KEY
+npm run plan -- "Tampa, FL" --vibes "chill, live music" --budget 220
 ```
 
-One `slr_live_` key works across browsers, sandboxes, and desktops, and every
-product bills to the same balance.
+```
+Launching 6 cloud browsers in parallel:
+  ✓ google-maps   in position, verified (2.1s)
+  ✓ groupon       in position, verified (2.4s)
+  ● timeout        20 found (8.3s)
+  ● groupon        27 found (11.7s)
+  ● google-maps    34 found (21.6s)
 
-## Which product do I want?
+102 candidates from 6/6 sources in 21.6s
 
-- **Cloud browser** — you need a *web page*: scraping, testing, filling forms,
-  anything Playwright or Puppeteer would do locally. Adds stealth, managed
-  proxies, captcha solving, profiles, and session recording.
-- **Sandbox** — you need to *run code*: an LLM's Python, an untrusted build, a
-  data job. A headless microVM that boots from a snapshot in about a second.
-- **Desktop** — you need a *screen*: computer-use agents, GUI apps, anything
-  that has to be clicked. A sandbox plus X11 and a live VNC stream.
+Saturday, Sep 5  85°/78°F, thunderstorms, 66% rain
+────────────────────────────────────────────────────────────────────
+  Morning    Kava Culture Tampa
+             $15      food
+             4.6★ from 600 reviews; indoor, which suits the forecast
 
-## Gotchas the examples encode
+  Afternoon  Henry B. Plant Museum
+             —        culture  (0.4 mi hop)
+             3 independent sources found this; indoor, which suits the forecast
 
-Things that cost you an afternoon if you meet them cold:
+  Evening    Bob Ross Sip & Paint Night at Kava Culture Downtown Tampa
+             free     event
+             a dated event, not an everyday venue; free
+```
 
-- **TypeScript: call `await solari.close()`.** The browser client keeps a
-  loopback proxy open for connection retries. Skip the close and your script
-  prints its output and then hangs forever instead of exiting.
-- **Recording is per session, not per account.** Pass `recording: true` when you
-  create the session; without it the replay endpoint 404s forever. The upload is
-  async after release, so poll for ~30s before giving up.
-- **Sandbox commands are not shell-interpreted.** `run("ls -la")` looks for a
-  binary named `ls -la`. Put argv in `args`, or run `sh -c` explicitly.
-- **`kill()`, not `close()`, ends a VM.** `close()` drops your local control
-  channel; the VM keeps running until its idle timeout.
-- **`timeoutMs` is a rolling idle window**, not a hard deadline — it resets on
-  every use.
+## Why it needs cloud browsers
 
-## Links
+Google Maps, Groupon, Eventbrite and Yelp all answer *"what's on this weekend"* differently depending on **where the browser is**. You cannot `fetch()` your way to a local answer.
+
+So: one browser per source, all placed in your city, all at once. Six sources answer in the time the slowest one takes. `npm run geo-proof` asks *"live music"* from two cities simultaneously and diffs the answers:
+
+| Tampa browser | Seattle browser |
+|---|---|
+| 1920 Ybor | Neumos |
+| The Sapphire Tampa | The Crocodile |
+| Chewy's Lounge | Dimitriou's Jazz Alley |
+
+**0% overlap** — from the same residential IP pool.
+
+Three things make it a planner rather than a scraper:
+
+- **Corroboration.** Three independent sources finding the same venue means more than any one ranking it first — and it's the signal only a parallel fan-out can compute.
+- **A geolocation gate.** Nothing searches until the browser proves where it is, because a silently-failed override returns plausible results for the wrong city and poisons the store.
+- **It learns.** Rate a plan; the next one is different. Deterministic, inspectable, and it works with the LLM switched off.
+
+Full details, the measured dead ends, and four gotchas that each cost an afternoon: **[weekendfun/README.md](weekendfun/README.md)**.
+
+---
+
+## The upstream cookbook
+
+The original Solari examples are unchanged in [`examples/`](examples) — short, runnable, one idea each.
+
+| Cloud browser | | Sandbox | | Desktop | |
+| --- | --- | --- | --- | --- | --- |
+| [browser-quickstart-ts](examples/browser-quickstart-ts) | TS | [sandbox-quickstart-ts](examples/sandbox-quickstart-ts) | TS | [desktop-computer-use-py](examples/desktop-computer-use-py) | Py |
+| [browser-quickstart-py](examples/browser-quickstart-py) | Py | [sandbox-code-interpreter-py](examples/sandbox-code-interpreter-py) | Py | | |
+| [browser-stealth-proxy-ts](examples/browser-stealth-proxy-ts) | TS | [sandbox-port-preview-ts](examples/sandbox-port-preview-ts) | TS | | |
+| [browser-profiles-ts](examples/browser-profiles-ts) | TS | | | | |
+| [browser-session-recording-py](examples/browser-session-recording-py) | Py | | | | |
+
+```bash
+cd examples/browser-quickstart-ts
+npm install
+export SOLARI_API_KEY=slr_live_...
+npm start
+```
+
+One `slr_live_` key works across browsers, sandboxes and desktops.
 
 - Docs — [docs.getsolari.com](https://docs.getsolari.com)
 - Console — [console.getsolari.com](https://console.getsolari.com)
-- Changelog — [changelog.getsolari.com](https://changelog.getsolari.com)
-- Questions — [hello@getsolari.com](mailto:hello@getsolari.com)
-
-## Contributing
-
-New examples are welcome. Keep them small, make them run end-to-end against the
-real API, and put anything surprising in a comment right where it bites.
 
 MIT licensed.

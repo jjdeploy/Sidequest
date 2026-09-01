@@ -6,3 +6,7 @@ __pycache__/
 .venv/
 venv/
 screenshot.png
+
+# WeekendFun learning store
+weekendfun/data/
+data/

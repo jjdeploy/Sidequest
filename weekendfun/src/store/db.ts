@@ -1,0 +1,335 @@
+/**
+ * The memory. This is what makes WeekendFun a planner rather than a scraper.
+ *
+ * Uses `node:sqlite`, which is built into Node 22 — no native module, no
+ * build step, nothing for a reviewer to install before the repo runs.
+ *
+ * The schema separates two things that are easy to conflate:
+ *
+ *   candidates  the venue itself, deduped by name across every source and
+ *               every run. One row per real-world place, ever.
+ *   sightings   one source seeing that venue on one run. Many per candidate.
+ *
+ * Keeping them apart is what buys corroboration ("three sources found this")
+ * and history ("you have been shown this four weekends running and never once
+ * picked it") — both of which are just counts over `sightings` and `signals`.
+ */
+import { DatabaseSync } from "node:sqlite"
+import { mkdirSync } from "node:fs"
+import { dirname } from "node:path"
+import type { Candidate, PlanRequest, SourceResult } from "../types.js"
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS runs (
+  id           TEXT PRIMARY KEY,
+  created_at   TEXT NOT NULL,
+  place_label  TEXT NOT NULL,
+  lat          REAL NOT NULL,
+  lng          REAL NOT NULL,
+  request_json TEXT NOT NULL,
+  elapsed_ms   INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS candidates (
+  id           TEXT PRIMARY KEY,
+  title        TEXT NOT NULL,
+  url          TEXT NOT NULL,
+  category     TEXT NOT NULL,
+  price_usd    REAL,
+  rating       REAL,
+  review_count INTEGER,
+  lat          REAL,
+  lng          REAL,
+  indoor       INTEGER,
+  first_seen   TEXT NOT NULL,
+  last_seen    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sightings (
+  run_id       TEXT NOT NULL,
+  candidate_id TEXT NOT NULL,
+  source       TEXT NOT NULL,
+  evidence     TEXT NOT NULL,
+  price_usd    REAL,
+  session_id   TEXT,
+  scraped_at   TEXT NOT NULL,
+  PRIMARY KEY (run_id, candidate_id, source)
+);
+CREATE INDEX IF NOT EXISTS idx_sightings_candidate ON sightings(candidate_id);
+
+CREATE TABLE IF NOT EXISTS plans (
+  id         TEXT PRIMARY KEY,
+  run_id     TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  items_json TEXT NOT NULL
+);
+
+-- What the user actually thought. The whole learning loop reads from here.
+CREATE TABLE IF NOT EXISTS signals (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  candidate_id TEXT NOT NULL,
+  run_id       TEXT,
+  kind         TEXT NOT NULL,   -- kept | skipped | did | rated
+  value        REAL NOT NULL,   -- rated: 1..5. others: 1.
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_signals_candidate ON signals(candidate_id);
+
+-- The learned taste vector: category weights, price tolerance, and so on.
+-- Deliberately a flat key/value table so adding a learned dimension never
+-- needs a migration.
+CREATE TABLE IF NOT EXISTS weights (
+  key        TEXT PRIMARY KEY,
+  value      REAL NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`
+
+export interface SightingRow {
+  source: string
+  evidence: string
+  sessionId: string | null
+}
+
+export class Store {
+  private readonly db: DatabaseSync
+
+  constructor(path: string) {
+    if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true })
+    this.db = new DatabaseSync(path)
+    // WAL keeps the CLI readable from a second process (the dashboard, later)
+    // while a plan run is mid-write.
+    this.db.exec("PRAGMA journal_mode = WAL;")
+    this.db.exec(SCHEMA)
+  }
+
+  close(): void {
+    this.db.close()
+  }
+
+  // ---------------------------------------------------------------- writing
+
+  recordRun(runId: string, req: PlanRequest, elapsedMs: number): void {
+    this.db
+      .prepare(
+        `INSERT INTO runs (id, created_at, place_label, lat, lng, request_json, elapsed_ms)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        runId,
+        new Date().toISOString(),
+        req.place.label,
+        req.place.lat,
+        req.place.lng,
+        JSON.stringify(req),
+        elapsedMs,
+      )
+  }
+
+  /**
+   * Persist everything a fan-out found.
+   *
+   * Candidates upsert: a venue seen again keeps its original `first_seen` (so
+   * "how long have we known about this" survives) but takes the newer facts,
+   * because ratings and prices move. `COALESCE` on the incoming side means a
+   * source that doesn't report a price can never blank out one we already had.
+   */
+  saveResults(runId: string, results: SourceResult[]): void {
+    const upsertCandidate = this.db.prepare(
+      `INSERT INTO candidates
+         (id, title, url, category, price_usd, rating, review_count, lat, lng, indoor, first_seen, last_seen)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         title        = excluded.title,
+         url          = excluded.url,
+         -- Category is deliberately NOT overwritten.
+         --
+         -- The in-memory merge in score.ts keeps the FIRST source's category,
+         -- so taking the last one here made the stored category disagree with
+         -- the one the user was shown. Skipping the Florida Aquarium (shown as
+         -- "family") taught the learner about "culture", because Time Out
+         -- happened to write last. Whatever the ranking displays is what the
+         -- feedback has to be attributed to, or the taste vector learns
+         -- something the user never said.
+         category     = candidates.category,
+         price_usd    = COALESCE(excluded.price_usd, candidates.price_usd),
+         -- Keep the better-evidenced numbers rather than the last-written
+         -- ones. Sources disagree (Maps counted 5,606 reviews for the Tampa
+         -- Riverwalk, TripAdvisor 1,906) and whichever source happened to run
+         -- last was silently overwriting the richer answer.
+         review_count = MAX(COALESCE(excluded.review_count, 0), COALESCE(candidates.review_count, 0)),
+         rating       = CASE
+                          WHEN COALESCE(excluded.review_count, 0) >= COALESCE(candidates.review_count, 0)
+                            THEN COALESCE(excluded.rating, candidates.rating)
+                          ELSE COALESCE(candidates.rating, excluded.rating)
+                        END,
+         lat          = COALESCE(excluded.lat, candidates.lat),
+         lng          = COALESCE(excluded.lng, candidates.lng),
+         indoor       = COALESCE(excluded.indoor, candidates.indoor),
+         last_seen    = excluded.last_seen`,
+    )
+    const insertSighting = this.db.prepare(
+      `INSERT OR REPLACE INTO sightings
+         (run_id, candidate_id, source, evidence, price_usd, session_id, scraped_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+
+    // One transaction for the whole fan-out: a hundred candidates is a hundred
+    // fsyncs otherwise, which dwarfs the time the scraping took.
+    this.db.exec("BEGIN")
+    try {
+      for (const result of results) {
+        for (const c of result.candidates) {
+          upsertCandidate.run(
+            c.id,
+            c.title,
+            c.url,
+            c.category,
+            c.priceUsd,
+            c.rating,
+            c.reviewCount ?? null,
+            c.lat ?? null,
+            c.lng ?? null,
+            c.indoor === null ? null : c.indoor ? 1 : 0,
+            c.scrapedAt,
+            c.scrapedAt,
+          )
+          insertSighting.run(
+            runId,
+            c.id,
+            c.source,
+            c.evidence,
+            c.priceUsd,
+            c.sessionId ?? null,
+            c.scrapedAt,
+          )
+        }
+      }
+      this.db.exec("COMMIT")
+    } catch (err) {
+      this.db.exec("ROLLBACK")
+      throw err
+    }
+  }
+
+  savePlan(planId: string, runId: string, title: string, items: unknown): void {
+    this.db
+      .prepare(`INSERT INTO plans (id, run_id, created_at, title, items_json) VALUES (?, ?, ?, ?, ?)`)
+      .run(planId, runId, new Date().toISOString(), title, JSON.stringify(items))
+  }
+
+  addSignal(candidateId: string, kind: string, value = 1, runId?: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO signals (candidate_id, run_id, kind, value, created_at) VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(candidateId, runId ?? null, kind, value, new Date().toISOString())
+  }
+
+  setWeight(key: string, value: number): void {
+    this.db
+      .prepare(
+        `INSERT INTO weights (key, value, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      )
+      .run(key, value, new Date().toISOString())
+  }
+
+  // ---------------------------------------------------------------- reading
+
+  getWeights(): Record<string, number> {
+    const rows = this.db.prepare(`SELECT key, value FROM weights`).all() as Array<{
+      key: string
+      value: number
+    }>
+    return Object.fromEntries(rows.map((r) => [r.key, r.value]))
+  }
+
+  /** How many DISTINCT sources saw this venue on this run. The corroboration
+   *  signal — the single most useful thing the store computes. */
+  corroborationFor(runId: string): Map<string, number> {
+    const rows = this.db
+      .prepare(
+        `SELECT candidate_id, COUNT(DISTINCT source) AS n
+         FROM sightings WHERE run_id = ? GROUP BY candidate_id`,
+      )
+      .all(runId) as Array<{ candidate_id: string; n: number }>
+    return new Map(rows.map((r) => [r.candidate_id, r.n]))
+  }
+
+  /** Aggregate history per candidate, across all previous runs. */
+  historyFor(candidateIds: string[]): Map<string, { shown: number; kept: number; skipped: number; did: number; rating: number | null }> {
+    const out = new Map<string, { shown: number; kept: number; skipped: number; did: number; rating: number | null }>()
+    if (candidateIds.length === 0) return out
+
+    const placeholders = candidateIds.map(() => "?").join(",")
+    const shown = this.db
+      .prepare(
+        `SELECT candidate_id, COUNT(DISTINCT run_id) AS n FROM sightings
+         WHERE candidate_id IN (${placeholders}) GROUP BY candidate_id`,
+      )
+      .all(...candidateIds) as Array<{ candidate_id: string; n: number }>
+    const sig = this.db
+      .prepare(
+        `SELECT candidate_id, kind, COUNT(*) AS n, AVG(value) AS avg_value FROM signals
+         WHERE candidate_id IN (${placeholders}) GROUP BY candidate_id, kind`,
+      )
+      .all(...candidateIds) as Array<{ candidate_id: string; kind: string; n: number; avg_value: number }>
+
+    for (const id of candidateIds) {
+      out.set(id, { shown: 0, kept: 0, skipped: 0, did: 0, rating: null })
+    }
+    for (const r of shown) {
+      const e = out.get(r.candidate_id)
+      if (e) e.shown = r.n
+    }
+    for (const r of sig) {
+      const e = out.get(r.candidate_id)
+      if (!e) continue
+      if (r.kind === "kept") e.kept = r.n
+      else if (r.kind === "skipped") e.skipped = r.n
+      else if (r.kind === "did") e.did = r.n
+      else if (r.kind === "rated") e.rating = r.avg_value
+    }
+    return out
+  }
+
+  /** Signals joined to the category they were about — the learner's input. */
+  signalsWithCategory(): Array<{ category: string; kind: string; value: number; priceUsd: number | null }> {
+    return this.db
+      .prepare(
+        `SELECT c.category AS category, s.kind AS kind, s.value AS value, c.price_usd AS priceUsd
+         FROM signals s JOIN candidates c ON c.id = s.candidate_id`,
+      )
+      .all() as Array<{ category: string; kind: string; value: number; priceUsd: number | null }>
+  }
+
+  /** Look up a candidate by an id prefix, so the CLI can take short ids. */
+  resolveCandidate(prefix: string): { id: string; title: string; category: string } | null {
+    const rows = this.db
+      .prepare(`SELECT id, title, category FROM candidates WHERE id LIKE ? LIMIT 2`)
+      .all(`${prefix}%`) as Array<{ id: string; title: string; category: string }>
+    // Ambiguous prefixes must fail loudly — silently rating the wrong venue
+    // corrupts the learner in a way that is very hard to notice later.
+    return rows.length === 1 ? rows[0]! : null
+  }
+
+  recentRuns(limit = 10): Array<{ id: string; created_at: string; place_label: string; elapsed_ms: number }> {
+    return this.db
+      .prepare(
+        `SELECT id, created_at, place_label, elapsed_ms FROM runs ORDER BY created_at DESC LIMIT ?`,
+      )
+      .all(limit) as Array<{ id: string; created_at: string; place_label: string; elapsed_ms: number }>
+  }
+
+  counts(): { candidates: number; sightings: number; signals: number; runs: number } {
+    const one = (sql: string) => (this.db.prepare(sql).get() as { n: number }).n
+    return {
+      candidates: one("SELECT COUNT(*) AS n FROM candidates"),
+      sightings: one("SELECT COUNT(*) AS n FROM sightings"),
+      signals: one("SELECT COUNT(*) AS n FROM signals"),
+      runs: one("SELECT COUNT(*) AS n FROM runs"),
+    }
+  }
+}
