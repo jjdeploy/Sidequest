@@ -184,20 +184,25 @@ export function categoryFromMapsType(raw: string): Category | null {
   const s = raw.toLowerCase().trim()
   if (!s) return null
   const table: Array<[RegExp, Category]> = [
-    // NOTE: "tourist attraction" is deliberately absent. Maps applies it to
-    // parks, beaches and bowling alleys alike — it is a search-result label,
-    // not a type — and matching it here filed six Palm Coast parks under
-    // culture. Falling through to the name gets "Waterfront Park" right.
-    [/museum|gallery|historical|landmark|monument|观光/, "culture"],
-    [/theater|theatre|performing arts|opera|cinema|movie/, "culture"],
-    [/live music|concert|music venue|jazz|night club dj/, "music"],
-    [/night club|dance club|disco/, "nightlife"],
-    [/bar\b|pub|brewery|brewpub|winery|wine bar|cocktail|taproom|distillery/, "drink"],
-    [/coffee|cafe|café|restaurant|bakery|deli|food|pizza|diner|steak|sushi|barbecue|ice cream/, "food"],
-    [/park|garden|beach|trail|nature|lake|scenic|waterfront|zoo. garden/, "outdoors"],
-    [/zoo|aquarium|amusement|theme park|water park|playground|children/, "family"],
-    [/gym|fitness|climbing|kayak|bowling|golf|skating|go-kart|amusement center|arcade/, "active"],
-    [/shopping|store|shop\b|market|mall|boutique/, "shopping"],
+    // Anchored, for the same reason guessCategory is: an unanchored token
+    // finds a word to hide in. "pub" matched "Notary public" and filed a
+    // notary under drinks; "park" would have matched "Park & Ride".
+    //
+    // "tourist attraction" is deliberately absent. Maps applies it to
+    // parks, beaches and bowling alleys alike — it is a search-result
+    // label, not a type — and matching it filed six Palm Coast parks
+    // under culture. Falling through to the name gets "Waterfront Park"
+    // right.
+    [/\b(museums?|galler(?:y|ies)|historical?|landmarks?|monuments?)\b|观光/, "culture"],
+    [/\b(theat\w*|performing arts|opera|cinemas?|movies?)\b/, "culture"],
+    [/\b(live music|concerts?|music venue|jazz)\b/, "music"],
+    [/\b(night ?clubs?|dance clubs?|disco)\b/, "nightlife"],
+    [/\b(bars?|pubs?|brewer\w*|brewpub|winer\w*|wine bar|cocktails?|taprooms?|distiller\w*)\b/, "drink"],
+    [/\b(coffee|cafes?|café|restaurants?|baker(?:y|ies)|delis?|food|pizza|diners?|steak\w*|sushi|barbecue|ice cream)\b/, "food"],
+    [/\b(parks?|gardens?|beach\w*|trails?|nature|lakes?|scenic|waterfront|greenway)\b/, "outdoors"],
+    [/\b(zoos?|aquariums?|amusement|theme park|water park|playgrounds?|children\w*)\b/, "family"],
+    [/\b(gyms?|fitness|climbing|kayak\w*|bowling|golf|skating|go-kart|arcades?)\b/, "active"],
+    [/\b(shopping|stores?|shops?|markets?|malls?|boutiques?)\b/, "shopping"],
   ]
   for (const [re, cat] of table) if (re.test(s)) return cat
   return null

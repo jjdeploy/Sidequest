@@ -1,0 +1,189 @@
+/**
+ * The extraction layer.
+ *
+ * Every case here is a bug that shipped and produced a plausible wrong answer
+ * rather than an error, which is exactly the class of failure a scraper is
+ * worst at noticing. The test names say what went wrong, not what the
+ * function does.
+ */
+import { test, describe } from "node:test"
+import assert from "node:assert/strict"
+import {
+  categoryFromMapsType,
+  guessCategory,
+  isJunkEvent,
+  milesBetween,
+  parsePrice,
+  parseRating,
+  parseReviewCount,
+} from "../src/sources/util.js"
+import { cleanField, decodeEntities, isDegenerate } from "../src/sources/text.js"
+
+describe("guessCategory: unanchored tokens hide inside longer words", () => {
+  // Four of the ten rules were unanchored, and each token found a word to
+  // hide in. The category is not cosmetic — it is what feedback teaches the
+  // learner about — so a wrong one trains a preference nobody expressed.
+  const cases: Array<[string, string]> = [
+    ["5pm In Tampa The R&B Block Party", "event"],       // "art" matched "P-art-y"
+    ["SUNDRESS & SNEAKERS DAY PARTY", "event"],
+    ["Sparkman Wharf shops", "shopping"],                 // "park" matched "S-park-man"
+    ["Bazooka Charlie's", "other"],                       // "zoo" matched "Ba-zoo-ka"
+    ["Signature Salon", "other"],                         // "nature" matched "Sig-nature"
+  ]
+  for (const [title, want] of cases) {
+    test(`${title} -> ${want}`, () => assert.equal(guessCategory(title), want))
+  }
+})
+
+describe("guessCategory: food is tested before shopping", () => {
+  // First-match-wins, and "shop" is the most promiscuous token in the list.
+  // "Blind Tiger Coffee Roasters - Coffee Shop" was filed under shopping,
+  // and rating it in the dashboard taught the learner about shopping.
+  const cases: Array<[string, string]> = [
+    ["Blind Tiger Coffee Roasters - Tampa City Center Cafe - Coffee Shop", "food"],
+    ["Bay Cities Sandwich Shop", "food"],
+    ["Buddy Brew Coffee", "food"],
+    // ...without swallowing things that really are shops.
+    ["Ybor City Saturday Market", "shopping"],
+    ["Oxford Exchange Bookstore", "shopping"],
+    ["Vintage thrift boutique", "shopping"],
+  ]
+  for (const [title, want] of cases) {
+    test(`${title} -> ${want}`, () => assert.equal(guessCategory(title), want))
+  }
+})
+
+describe("guessCategory: things that must keep working", () => {
+  const cases: Array<[string, string]> = [
+    ["Tampa Museum of Art", "culture"],
+    ["Straz Center for the Performing Arts", "culture"],
+    ["Curtis Hixon Waterfront Park", "outdoors"],
+    ["The Florida Aquarium", "family"],
+    ["Cigar City Brewing taproom", "drink"],
+    ["Jazz at the Palladium", "music"],
+    ["Gasparilla Festival", "event"],
+    // An unanchored "eat" filed this under food.
+    ["Great Escape Room", "other"],
+  ]
+  for (const [title, want] of cases) {
+    test(`${title} -> ${want}`, () => assert.equal(guessCategory(title), want))
+  }
+})
+
+describe("categoryFromMapsType", () => {
+  test('"Coffee shop" is food, not shopping', () => {
+    assert.equal(categoryFromMapsType("Coffee shop"), "food")
+  })
+  test('"Bowling alley" is active — this is how Palm Coast Lanes gets categorised', () => {
+    assert.equal(categoryFromMapsType("Bowling alley"), "active")
+  })
+  test('"Tourist attraction" resolves to nothing, so the name decides', () => {
+    // Maps applies it to parks, beaches and bowling alleys alike. Treating it
+    // as a category filed six Palm Coast parks under culture.
+    assert.equal(categoryFromMapsType("Tourist attraction"), null)
+    assert.equal(categoryFromMapsType("Tourist attraction") ?? guessCategory("Waterfront Park"), "outdoors")
+  })
+  test("an unknown descriptor returns null rather than guessing", () => {
+    assert.equal(categoryFromMapsType("Notary public"), null)
+    assert.equal(categoryFromMapsType(""), null)
+  })
+})
+
+describe("parseReviewCount", () => {
+  test('does not read the "4" out of "4.7 stars"', () => {
+    // A bare leading number matched the rating, and every venue in the plan
+    // came back with exactly 4 reviews.
+    assert.equal(parseReviewCount("4.7 stars"), null)
+  })
+  test("reads the parenthesised form Maps and TripAdvisor use", () => {
+    assert.equal(parseReviewCount("4.7(4,605)"), 4605)
+  })
+  test("reads the worded form", () => {
+    assert.equal(parseReviewCount("4.5 stars 22,001 Reviews"), 22001)
+  })
+  test("returns null when there is no count, rather than zero", () => {
+    // null means "not published"; 0 would mean "nobody has reviewed it", and
+    // the scorer treats those very differently.
+    assert.equal(parseReviewCount("Open · Closes 12 AM"), null)
+  })
+})
+
+describe("parsePrice", () => {
+  test("free is 0, unknown is null, and they are not the same thing", () => {
+    assert.equal(parsePrice("Free").usd, 0)
+    assert.equal(parsePrice("").usd, null)
+    assert.equal(parsePrice(null).usd, null)
+  })
+  test("a range is a range: the midpoint, not the low end", () => {
+    // Taking the low end reports "$1-10" as a $1 dinner. The hyphen shape is
+    // matched explicitly because it usually carries only one dollar sign.
+    assert.equal(parsePrice("$10–20").usd, 15)
+    assert.equal(parsePrice("$15 - $40").usd, 27.5)
+  })
+  test("plain dollars", () => {
+    assert.equal(parsePrice("$25.99").usd, 25.99)
+  })
+})
+
+describe("parseRating", () => {
+  test("reads Maps' aria-label", () => assert.equal(parseRating("4.6 stars"), 4.6))
+  test("null when absent", () => assert.equal(parseRating(""), null))
+})
+
+describe("isJunkEvent", () => {
+  // Eventbrite and AllEvents are full of listings that are business
+  // marketing. They rank well on a free-and-dated bonus and are useless in a
+  // weekend plan. An early run proudly scheduled the first of these for a
+  // Saturday night.
+  const junk = [
+    "HPM- Archwell MA/ACA networking event - earn CE credits",
+    "Virtual Summit: Scaling Your Practice",
+    "Heart Health Lunch & Learn",
+    "TPA Ticketing Expansion Project Informational Session",
+    "College Visit to Middleton HS",
+    "Real Estate Investing Masterclass",
+  ]
+  for (const title of junk) test(`rejects "${title.slice(0, 40)}…"`, () => assert.equal(isJunkEvent(title), true))
+
+  const fine = [
+    "5pm In Tampa The R&B Block Party",
+    "Gasparilla Music Festival",
+    "Bob Ross Sip & Paint Night",
+    "Tampa Tarpons vs Dunedin Blue Jays",
+    // "college football game" is a great Saturday; the school filter has to
+    // stay narrow enough not to eat it.
+    "USF college football game",
+  ]
+  for (const title of fine) test(`keeps "${title}"`, () => assert.equal(isJunkEvent(title), false))
+})
+
+describe("text hygiene", () => {
+  test("decodes double-encoded entities", () => {
+    assert.equal(decodeEntities("Fish &amp;amp; Chips"), "Fish & Chips")
+    assert.equal(decodeEntities("caf&#233;"), "café")
+  })
+  test('strips the chrome sites append to truncated text', () => {
+    // "&amp; Ho... Read more" was stored as a street address, which looks
+    // populated but is a lie the scorer cannot detect.
+    assert.equal(cleanField("&amp; Ho... Read more"), undefined)
+    assert.equal(cleanField("1920 Ybor Save this event: 5pm In Tampa"), "1920 Ybor")
+  })
+  test("an extraction that produced two characters is not a venue", () => {
+    assert.equal(isDegenerate("Ba"), true)
+    assert.equal(isDegenerate("& Ho"), true)
+    assert.equal(isDegenerate("·  ·"), true)
+    assert.equal(isDegenerate("Bing's Landing"), false)
+  })
+})
+
+describe("milesBetween", () => {
+  test("zero distance to itself", () => {
+    assert.ok(milesBetween(TAMPA_PT, TAMPA_PT) < 0.001)
+  })
+  test("Tampa to Palm Coast is about 150 miles", () => {
+    const miles = milesBetween(TAMPA_PT, { lat: 29.585, lng: -81.2078 })
+    assert.ok(miles > 130 && miles < 170, `got ${miles}`)
+  })
+})
+
+const TAMPA_PT = { lat: 27.94752, lng: -82.45843 }

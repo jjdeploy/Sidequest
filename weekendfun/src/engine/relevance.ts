@@ -87,7 +87,12 @@ const SUSPICIOUS_MILES = 45
 /** A distance the site itself published, e.g. Groupon's "West Boise, Meridian7.3 mi". */
 function publishedMiles(c: Candidate): number | null {
   const hay = `${c.evidence} ${c.address ?? ""}`
-  const m = hay.match(/(\d{1,3}(?:\.\d)?)\s*mi\b/i)
+  // `mi\b` requires a word boundary AFTER "mi", and Groupon writes its
+  // distance with nothing after it: "West Boise, Meridian7.3 mi4.3(15)".
+  // So the one source that publishes its own distance was the one source
+  // this never read. The lookahead accepts a digit or punctuation next
+  // while still refusing "5 min" and "miles".
+  const m = hay.match(/(\d{1,3}(?:\.\d)?)\s*mi(?![a-z])/i)
   if (!m) return null
   const miles = Number(m[1])
   return Number.isFinite(miles) ? miles : null

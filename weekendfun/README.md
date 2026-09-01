@@ -242,6 +242,42 @@ rather than to noise, and two clicks can't invert your results. It's a full
 recompute from signal history, not an incremental nudge — so deleting a bad
 signal actually undoes it.
 
+## Tests, and what they're for
+
+```bash
+npm test        # 109 tests, no dependencies, ~1s
+```
+
+`node --test` with `tsx`, so there's no framework and nothing new to install.
+The store tests run against `:memory:`, which is one of the reasons
+`node:sqlite` was worth choosing over a native module.
+
+Every test is **named for a bug that shipped**, because every one of them
+produced a plausible wrong answer rather than an error — which is the failure
+mode a scraper is worst at noticing:
+
+```
+✔ 5pm In Tampa The R&B Block Party -> event          ("art" matched "P-art-y")
+✔ Blind Tiger Coffee Roasters - Coffee Shop -> food  ("shop" beat "coffee")
+✔ does not read the "4" out of "4.7 stars"
+✔ a Saturday event is never scheduled on Sunday
+✔ an event dated outside the weekend is never scheduled at all
+✔ no coordinates is UNKNOWN, not ok and not a failure
+✔ a locality matched in free text can cost points but never rejects
+✔ the stored category is the one the user was shown
+✔ it is a full recompute, so deleting a signal actually undoes it
+✔ "chill, outdoorsy" gets no restaurants padded in
+```
+
+Writing them found two more, immediately:
+
+- `categoryFromMapsType` had the same unanchored-token bug as
+  `guessCategory` — `pub` matched "Notary **pub**lic", filing a notary under
+  drinks.
+- `publishedMiles` required a word boundary after `mi`, and Groupon writes its
+  distance as `7.3 mi4.3(15)`. So the one source that publishes its own
+  distance was the one source that was never read.
+
 ## It works outside the city it was written in
 
 ```bash
@@ -256,6 +292,7 @@ point is to see it.
 
 ```bash
 npm run dashboard                     the browser UI — start here
+npm test                              109 tests, no dependencies
 npm run plan -- "Tampa, FL"
 npm run plan -- "Seattle, WA" -- --vibes "outdoorsy, cheap" --budget 150
 npm run plan -- "Austin, TX" -- --ask "date night, no driving, under $100"

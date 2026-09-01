@@ -7,12 +7,14 @@
   "scripts": {
     "plan": "tsx --env-file-if-exists=.env src/cli.ts plan",
     "dashboard": "tsx --env-file-if-exists=.env src/web/server.ts",
+    "test": "node --import tsx --test \"test/**/*.test.ts\"",
+    "test:watch": "node --import tsx --test --watch \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
     "sources": "tsx --env-file-if-exists=.env src/cli.ts sources",
     "feedback": "tsx --env-file-if-exists=.env src/cli.ts feedback",
     "history": "tsx --env-file-if-exists=.env src/cli.ts history",
     "geo-proof": "tsx --env-file-if-exists=.env src/geo-proof.ts",
-    "harden": "tsx --env-file-if-exists=.env src/harden.ts",
-    "typecheck": "tsc --noEmit"
+    "harden": "tsx --env-file-if-exists=.env src/harden.ts"
   },
   "dependencies": {
     "@solarisdk/browser": "^0.1.1",
