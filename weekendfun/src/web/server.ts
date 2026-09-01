@@ -107,8 +107,20 @@ async function serveStatic(res: ServerResponse, pathname: string): Promise<void>
 
 const str = (v: unknown, d = "") => (typeof v === "string" ? v : d)
 const listOf = (v: unknown) => str(v).split(",").map((s) => s.trim()).filter(Boolean)
+/**
+ * Read an integer query param, or fall back.
+ *
+ * The empty-string check is the whole point: `Number("")` is 0, not NaN, so
+ * an ABSENT parameter passed `Number.isFinite` and became zero. The page
+ * omits `concurrency`, so the pool was built with `maxConcurrent: 0` —
+ * clamped to one browser — and a thirteen-browser fan-out ran single file
+ * until the deadline killed it, reporting "1 of 6 sources answered". The
+ * same bug set the party to 0 adults and 0 kids.
+ */
 const int = (v: unknown, d: number) => {
-  const n = Number(str(v))
+  const raw = str(v).trim()
+  if (raw === "") return d
+  const n = Number(raw)
   return Number.isFinite(n) ? n : d
 }
 
@@ -144,21 +156,6 @@ async function handleState(res: ServerResponse): Promise<void> {
  * to be a GET for the same reason, so the request lives in the query string.
  */
 async function handlePlan(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
-  const apiKey = process.env.SOLARI_API_KEY
-  if (!apiKey) {
-    json(res, 400, { error: "SOLARI_API_KEY is not set. Copy .env.example to .env and add your key." })
-    return
-  }
-  const where = url.searchParams.get("city")?.trim()
-  if (!where) {
-    json(res, 400, { error: "which city?" })
-    return
-  }
-  if (running) {
-    json(res, 409, { error: `already planning ${running.city} — one fan-out at a time` })
-    return
-  }
-
   res.writeHead(200, {
     "content-type": "text/event-stream; charset=utf-8",
     "cache-control": "no-store",
@@ -171,6 +168,33 @@ async function handlePlan(req: IncomingMessage, res: ServerResponse, url: URL): 
   const send = (e: PlanEvent | { type: "done" }) => {
     if (res.writableEnded) return
     res.write(`data: ${JSON.stringify(e)}\n\n`)
+  }
+
+  // Refusals are reported INSIDE the stream, not as an HTTP status.
+  //
+  // `EventSource` gives the page no access to a non-200 response body — it
+  // just fires a generic `error`. So a 409 meaning "a plan is already
+  // running" reached the user as "lost the connection", which is both wrong
+  // and unactionable. Opening the stream and sending the real reason costs
+  // nothing, and it is the only way the browser can say what happened.
+  const refuse = (message: string) => {
+    send({ type: "error", message })
+    res.end()
+  }
+
+  const apiKey = process.env.SOLARI_API_KEY
+  if (!apiKey) {
+    refuse("SOLARI_API_KEY is not set. Copy .env.example to .env, add your key, and restart.")
+    return
+  }
+  const where = url.searchParams.get("city")?.trim()
+  if (!where) {
+    refuse("Tell me which town you are in.")
+    return
+  }
+  if (running) {
+    refuse(`Still planning ${running.city}. One at a time — give it a few seconds.`)
+    return
   }
 
   // If the tab closes mid-run we stop writing, but we do NOT abandon the run:
@@ -201,8 +225,8 @@ async function handlePlan(req: IncomingMessage, res: ServerResponse, url: URL): 
       {
         apiKey,
         sources: listOf(q.get("sources")),
-        concurrency: int(q.get("concurrency"), 12),
-        retries: int(q.get("retries"), 1),
+        concurrency: int(q.get("concurrency"), 18),
+        retries: int(q.get("retries"), 0),
         record: q.get("record") === "1",
         writeup: q.get("writeup") !== "0" && (await claudeAvailable()),
       },

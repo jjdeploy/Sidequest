@@ -4,206 +4,153 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WeekendFun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/app.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗺️</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🧭</text></svg>">
 </head>
-<body>
+<body data-screen="landing">
 
-<header class="topbar">
-  <div class="brand">
-    <span class="brand-mark" aria-hidden="true"></span>
-    <span class="brand-name">WeekendFun</span>
-    <span class="brand-sub">parallel cloud browsers, standing in your city</span>
-  </div>
-  <div class="topbar-right">
-    <dl class="stats" id="stats"></dl>
-    <span class="status status--idle" id="status">idle</span>
-  </div>
-</header>
+<!-- ══════════════════════════════════════════════════════════════ landing -->
+<section class="screen screen--landing" id="landing">
+  <header class="mast">
+    <span class="wordmark">WeekendFun</span>
+    <button class="linkish" id="aboutOpen" type="button">How it works</button>
+  </header>
 
-<main class="shell">
+  <div class="hero">
+    <h1 class="hero-line">
+      <span>It's the weekend</span>
+      <span>and you don't know</span>
+      <span>this town yet.</span>
+    </h1>
 
-  <!-- ───────────────────────────────────────────────────────────── sidebar -->
-  <aside class="sidebar">
-    <form class="card form" id="planForm" autocomplete="off">
-      <h2 class="card-title">Plan a weekend</h2>
+    <p class="hero-sub">
+      What's on near you is scattered across a dozen sites and none of them will
+      sell you an API. So we open a browser in your city — actually in it, at
+      your coordinates — and read all of them at the same time.
+    </p>
 
-      <label class="field">
-        <span class="field-label">Where</span>
-        <input name="city" id="city" list="cityList" placeholder="Tampa, FL" required>
-        <datalist id="cityList">
-          <option value="Tampa, FL"><option value="Austin, TX"><option value="Seattle, WA">
-          <option value="Asheville, NC"><option value="Boise, ID"><option value="Chicago, IL">
-          <option value="New Orleans, LA"><option value="Portland, OR">
-        </datalist>
-      </label>
-
-      <label class="field">
-        <span class="field-label">
-          Or just say it
-          <span class="field-hint" id="askHint">needs the claude CLI</span>
-        </span>
-        <textarea name="ask" id="ask" rows="2" placeholder="date night, no driving, under $100"></textarea>
-      </label>
-
-      <div class="field">
-        <span class="field-label">Vibes</span>
-        <div class="chips" id="vibeChips"></div>
-        <input name="vibes" id="vibes" placeholder="chill, live music">
+    <form class="ask" id="planForm" autocomplete="off">
+      <div class="ask-row">
+        <label class="ask-field">
+          <span class="ask-label">Where are you?</span>
+          <input id="city" name="city" list="cityList" placeholder="Palm Coast, FL" required
+                 autocapitalize="words" spellcheck="false">
+          <datalist id="cityList">
+            <option value="Palm Coast, FL"><option value="Tampa, FL"><option value="Austin, TX">
+            <option value="Seattle, WA"><option value="Asheville, NC"><option value="Boise, ID">
+            <option value="New Orleans, LA"><option value="Portland, OR">
+          </datalist>
+        </label>
+        <button class="go" id="go" type="submit">Find my weekend</button>
       </div>
 
-      <div class="field-row">
-        <label class="field">
-          <span class="field-label">Budget</span>
-          <input name="budget" id="budget" type="number" min="0" step="10" value="200">
-        </label>
-        <label class="field">
-          <span class="field-label">Adults</span>
-          <input name="adults" id="adults" type="number" min="1" max="12" value="2">
-        </label>
-        <label class="field">
-          <span class="field-label">Kids</span>
-          <input name="kids" id="kids" type="number" min="0" max="12" value="0">
-        </label>
+      <div class="moods">
+        <span class="moods-label">In the mood for anything in particular?</span>
+        <div class="chips" id="moodChips"></div>
+        <span class="moods-hint">Skip it and we'll sweep the lot — food, parks, museums, bowling, live music.</span>
       </div>
 
-      <label class="field">
-        <span class="field-label">Getting around</span>
-        <select name="mobility" id="mobility">
-          <option value="car">by car</option>
-          <option value="transit">transit</option>
-          <option value="walk">on foot</option>
-        </select>
-      </label>
-
-      <details class="advanced">
-        <summary>Advanced</summary>
-        <div class="field">
-          <span class="field-label">Sources</span>
-          <div class="chips chips--sources" id="sourceChips"></div>
-        </div>
-        <div class="field-row">
-          <label class="field">
-            <span class="field-label">Concurrency</span>
-            <input name="concurrency" id="concurrency" type="number" min="1" max="20" value="18">
-          </label>
-          <label class="field">
-            <span class="field-label">Retries</span>
-            <input name="retries" id="retries" type="number" min="0" max="3" value="0">
-          </label>
-        </div>
-        <label class="check">
-          <input type="checkbox" id="record">
-          <span>Record sessions <em>— enables the replay button on every result</em></span>
-        </label>
-        <label class="check">
-          <input type="checkbox" id="writeup" checked>
-          <span>Prose write-up <em>— shells out to the claude CLI</em></span>
-        </label>
-      </details>
-
-      <button class="go" id="go" type="submit">
-        <span class="go-label">Plan my weekend</span>
-        <span class="go-sub" id="goSub">6 browsers in parallel</span>
-      </button>
-      <p class="form-error" id="formError" hidden></p>
+      <p class="ask-error" id="formError" hidden></p>
     </form>
 
-    <section class="card" id="tasteCard">
-      <h2 class="card-title">
-        What it knows about you
-        <span class="card-note">learned, not configured</span>
-      </h2>
-      <div id="taste" class="taste"></div>
-      <ul class="signal-log" id="signalLog"></ul>
-    </section>
+    <div class="relocate">
+      <strong>Moving somewhere?</strong> Put the new city in. The browser stands
+      there, so the answers are that city's — not a guess made from here.
+    </div>
+  </div>
 
-    <section class="card">
-      <h2 class="card-title">Recent runs</h2>
-      <ul class="runs" id="runs"></ul>
-    </section>
-  </aside>
+  <footer class="landing-foot">
+    <span id="landingStats"></span>
+  </footer>
+</section>
 
-  <!-- ──────────────────────────────────────────────────────────────── main -->
-  <div class="stage">
+<!-- ══════════════════════════════════════════════════════════════ working -->
+<section class="screen screen--working" id="working">
+  <div class="readout" id="readout">
+    <div class="readout-place" id="readoutPlace">locating…</div>
+    <div class="readout-coords" id="readoutCoords">—</div>
+    <div class="readout-state" id="readoutState">
+      <span id="readoutCount">0</span> browsers in position
+    </div>
+  </div>
 
-    <section class="card step" id="stepKeywords" hidden>
-      <header class="step-head">
-        <span class="step-n">1</span>
-        <div>
-          <h2 class="card-title">What to look for</h2>
-          <p class="step-why">Decided before a single browser launches — holding twelve
-             sessions open while you think is spending the expensive thing to save the cheap one.</p>
-        </div>
-      </header>
-      <ul class="keywords" id="keywords"></ul>
-    </section>
+  <div class="working-body">
+    <div class="terms" id="terms"></div>
+    <div class="lanes" id="lanes"></div>
+    <p class="working-note">
+      Nothing searches until the page it opened confirms where it is. Whatever
+      hasn't answered in 20 seconds is left behind rather than kept waiting for.
+    </p>
+  </div>
+</section>
 
-    <section class="card step" id="stepFanout" hidden>
-      <header class="step-head">
-        <span class="step-n">2</span>
-        <div>
-          <h2 class="card-title">The fan-out</h2>
-          <p class="step-why">One browser per source, all of them placed in your city, all at
-             once. Nothing searches until the page itself confirms where it is.</p>
-        </div>
-      </header>
-      <div class="geo" id="geo" hidden></div>
-      <div class="gantt" id="gantt">
-        <div class="gantt-lanes" id="lanes"></div>
-        <div class="gantt-axis" id="axis"></div>
-      </div>
-      <div class="fanout-stats" id="fanoutStats" hidden></div>
-    </section>
+<!-- ══════════════════════════════════════════════════════════════ results -->
+<section class="screen screen--results" id="results">
+  <header class="bar">
+    <button class="linkish" id="restart" type="button">← Somewhere else</button>
+    <div class="bar-coords" id="barCoords"></div>
+    <button class="linkish" id="aboutOpen2" type="button">How it works</button>
+  </header>
 
-    <section class="card step" id="stepPlan" hidden>
-      <header class="step-head">
-        <span class="step-n">3</span>
-        <div>
-          <h2 class="card-title">Your weekend</h2>
-          <p class="step-why">A ranked list isn't a plan. This one avoids repeating a category
-             back to back, keeps the driving sane, and pushes outdoor things off the wet day.</p>
-        </div>
-        <label class="check check--inline">
-          <input type="checkbox" id="explainToggle">
-          <span>show the arithmetic</span>
-        </label>
-      </header>
-      <div class="plan-grid">
-        <div class="plan-days" id="planDays"></div>
-        <div class="map-wrap">
-          <div class="map" id="map"></div>
-          <div class="map-legend" id="mapLegend"></div>
-        </div>
-      </div>
+  <div class="wrap">
+    <!-- the plan -->
+    <section class="plan" id="plan">
+      <div class="eyebrow"><span>The plan</span><em id="planMeta"></em></div>
+      <div class="days" id="days"></div>
       <div class="plan-foot" id="planFoot"></div>
     </section>
 
-    <section class="card step" id="stepWriteup" hidden>
-      <header class="step-head">
-        <span class="step-n">4</span>
-        <div>
-          <h2 class="card-title">The write-up</h2>
-          <p class="step-why">The only place a model touches your plan. Ranking, assembly and
-             learning are all deterministic code.</p>
-        </div>
-      </header>
-      <div class="writeup" id="writeup"></div>
+    <!-- the map -->
+    <section class="mapblock" id="mapblock">
+      <div class="map" id="map"></div>
+      <p class="map-note" id="mapNote"></p>
     </section>
 
-    <section class="empty" id="empty">
-      <div class="empty-art" aria-hidden="true">
-        <span></span><span></span><span></span><span></span><span></span><span></span>
+    <!-- the write-up -->
+    <section class="writeup" id="writeupBlock" hidden>
+      <div class="eyebrow"><span>Why this weekend</span></div>
+      <div id="writeup"></div>
+    </section>
+
+    <!-- everything else -->
+    <section class="catalogue" id="catalogue">
+      <div class="eyebrow">
+        <span>Everything else here</span>
+        <em id="catCount"></em>
       </div>
-      <h2>Six browsers are waiting.</h2>
-      <p>Pick a city and watch them work. Each one lands in your location, proves it,
-         then reads a different corner of the web — and the answers get merged into
-         one weekend that knows what you liked last time.</p>
+      <div class="filters" id="filters"></div>
+      <div class="groups" id="groups"></div>
     </section>
 
-  </div>
-</main>
+    <!-- engineering, one click deep -->
+    <details class="rig" id="rig">
+      <summary>
+        <span id="rigSummary">How this was found</span>
+        <span class="rig-more">show the machinery</span>
+      </summary>
+      <div class="rig-body">
+        <div class="rig-stats" id="rigStats"></div>
+        <div class="lanes lanes--static" id="lanesStatic"></div>
+        <div class="rig-gate" id="rigGate"></div>
+        <label class="switch">
+          <input type="checkbox" id="explainToggle">
+          <span>Show the score arithmetic on every card</span>
+        </label>
+      </div>
+    </details>
 
+    <!-- taste -->
+    <section class="taste-block" id="tasteBlock">
+      <div class="eyebrow"><span>What it's learned about you</span></div>
+      <div class="taste" id="taste"></div>
+    </section>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ modal -->
 <div class="modal" id="modal" hidden>
   <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <header class="modal-head">

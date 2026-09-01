@@ -415,7 +415,10 @@ export async function runPlan(
     relevance: verdicts,
   }
   const ranked = rank(admitted, ctx)
-  emit({ type: "ranked", top: ranked.slice(0, 40).map(toView) })
+  // Everything, not a top slice. The page shows the plan and then every
+  // other option underneath it, so truncating here would quietly cap the
+  // catalogue at 40 and there would be no way to tell from the outside.
+  emit({ type: "ranked", top: ranked.map(toView) })
 
   // 5. Assemble.
   const itinerary = buildItinerary(ranked, req, weather)
@@ -446,7 +449,12 @@ export function summarizeForWriteUp(it: Itinerary, req: PlanRequest): string {
   ]
   for (const day of it.days) {
     const w = day.weather
-    lines.push(`\n${day.date}${w ? ` (${w.highF}F, ${w.summary}, ${w.precipChance}% rain)` : ""}:`)
+    // Name the weekday. Given a bare "2026-09-05" the model guesses, and it
+    // guessed Friday for a Saturday — in prose sitting directly under a
+    // heading that said Saturday.
+    const weekday = new Date(`${day.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" })
+    lines.push(`
+${weekday} ${day.date}${w ? ` (${w.highF}F, ${w.summary}, ${w.precipChance}% rain)` : ""}:`)
     for (const item of day.items) {
       const c = item.scored.candidate
       const price = c.priceUsd === null ? "price unknown" : c.priceUsd === 0 ? "free" : `$${c.priceUsd}`

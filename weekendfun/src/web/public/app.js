@@ -1,22 +1,21 @@
 /**
- * WeekendFun dashboard — client.
+ * WeekendFun — client.
  *
  * No framework and no build step, for the same reason the server has no
- * dependencies: the repo's whole promise is `npm install` and go. This is one
- * page that renders a stream of events, which is about the least justified
+ * dependencies: the repo's promise is `npm install` and go. This is three
+ * screens rendering a stream of events, which is about the least justified
  * place in software to reach for a virtual DOM.
  *
- * Everything scraped off the web (titles, evidence snippets, addresses) is
- * written with `textContent`, never `innerHTML`. It is untrusted text from
- * six sites we don't control, and it goes on screen next to a form.
+ * Everything scraped off the web — titles, evidence, addresses — is written
+ * with `textContent`, never `innerHTML`. It is untrusted text from six sites
+ * we don't control and it goes on screen next to a form.
  */
 
-// ───────────────────────────────────────────────────────────────── helpers
+// ─────────────────────────────────────────────────────────────── helpers
 
 const $ = (id) => document.getElementById(id)
 
-/** Minimal element builder. `props` sets properties; `kids` accepts strings,
- *  nodes, or nested arrays, and strings become text nodes (never markup). */
+/** Minimal element builder. Strings become text nodes, never markup. */
 function el(tag, props = {}, kids = []) {
   const node = document.createElement(tag)
   for (const [k, v] of Object.entries(props)) {
@@ -35,24 +34,39 @@ function el(tag, props = {}, kids = []) {
   return node
 }
 
-const clear = (node) => { while (node.firstChild) node.removeChild(node.firstChild) }
+const clear = (n) => { while (n.firstChild) n.removeChild(n.firstChild) }
 const secs = (ms) => `${(ms / 1000).toFixed(1)}s`
-const money = (n) => (n === null ? "—" : n === 0 ? "free" : `$${Math.round(n)}`)
+const money = (n) => (n === null ? null : n === 0 ? "free" : `$${Math.round(n)}`)
 
-const SOURCE_COLORS = {
-  "google-maps": "var(--s-google-maps)",
-  eventbrite: "var(--s-eventbrite)",
-  allevents: "var(--s-allevents)",
-  groupon: "var(--s-groupon)",
-  tripadvisor: "var(--s-tripadvisor)",
-  timeout: "var(--s-timeout)",
-  reddit: "var(--s-reddit)",
+/** What each slot is called to someone reading a plan, not a schema. */
+const SLOT_TIME = { Morning: "10am", Afternoon: "2pm", Evening: "7pm" }
+
+/** Category labels in the user's words, not the enum's. */
+const CATEGORY_LABEL = {
+  food: "food", drink: "drinks", outdoors: "outdoors", culture: "culture",
+  music: "live music", nightlife: "nightlife", active: "something to do",
+  family: "family", shopping: "shops", event: "events", other: "other",
 }
-const srcVar = (id) => `--src:${SOURCE_COLORS[id] ?? "var(--muted)"}`
 
-const VIBE_PRESETS = [
-  "chill", "live music", "outdoorsy", "date night", "cheap",
-  "family", "foodie", "artsy", "nightlife", "rainy day",
+/**
+ * Moods, in the words someone bored would use.
+ *
+ * These map onto the vibe vocabulary in engine/keywords.ts, which decides the
+ * Google Maps searches. Skipping them is fine — the keyword builder falls
+ * back to a broad sweep — but this is the low-friction onboarding question
+ * that gives a first-time request any shape at all, and a first-time request
+ * with no shape is the entire cold-start problem.
+ */
+const MOODS = [
+  ["eat something good", "foodie"],
+  ["get outside", "outdoorsy"],
+  ["live music", "nightlife"],
+  ["something to actually do", "active"],
+  ["with the kids", "family"],
+  ["museums and history", "cultural"],
+  ["keep it cheap", "cheap"],
+  ["stay indoors", "indoors"],
+  ["a chill one", "chill"],
 ]
 
 // ───────────────────────────────────────────────────────────────── state
@@ -60,190 +74,120 @@ const VIBE_PRESETS = [
 const state = {
   running: false,
   t0: 0,
-  lanes: new Map(),      // sourceId -> lane record
-  laneEls: new Map(),    // sourceId -> { row, bar, gate, work, out }
-  span: 20_000,          // gantt time axis, ms
+  lanes: new Map(),
+  laneEls: new Map(),
+  span: 20_000,
   recording: false,
-  sources: [],
-  pickedSources: new Set(),
+  moods: new Set(),
   itinerary: null,
+  catalogue: [],
+  planned: new Set(),
+  filter: "all",
+  expanded: new Set(),
   weights: {},
-  feedback: new Map(),   // candidateId -> kind currently set
-  ratings: new Map(),    // candidateId -> 1..5
+  feedback: new Map(),
+  ratings: new Map(),
   explain: false,
   stream: null,
+  place: null,
+  gathered: null,
+  screened: null,
 }
 
-// ───────────────────────────────────────────────────────────── boot / state
+const screen = (name) => { document.body.dataset.screen = name }
+
+// ──────────────────────────────────────────────────────────────── boot
 
 async function boot() {
-  buildVibeChips()
-  wireForm()
-
+  buildMoods()
+  wire()
   try {
     const s = await (await fetch("/api/state")).json()
-    state.sources = s.sources
-    state.pickedSources = new Set(s.sources)
     state.weights = s.weights
-    buildSourceChips()
-    renderStats(s.counts)
-    renderTaste(s.weights, {})
-    renderSignals(s.signals)
-    renderRuns(s.runs)
-    updateGoSub()
-    const hint = $("askHint")
-    hint.textContent = s.claude ? "claude CLI found" : "needs the claude CLI"
-    hint.classList.toggle("ok", Boolean(s.claude))
-    $("ask").disabled = !s.claude
-    $("writeup").disabled = !s.claude
-    if (!s.claude) $("writeup").checked = false
-    if (s.lastPlan) $("empty").append(el("p", { class: "map-legend" },
-      `Last plan: ${s.lastPlan.title} · rate anything from a new run and the next one changes.`))
+    $("landingStats").textContent = s.counts.runs > 0
+      ? `${s.counts.runs} weekends planned · ${s.counts.candidates.toLocaleString()} places known so far`
+      : "nothing planned here yet"
   } catch {
-    setStatus("err", "server unreachable")
+    showError("Can't reach the WeekendFun server. Is `npm run dashboard` still running?")
   }
 }
 
-function renderStats(c) {
-  const stats = $("stats")
-  clear(stats)
-  const pairs = [["runs", c.runs], ["places", c.candidates], ["sightings", c.sightings], ["signals", c.signals]]
-  for (const [k, v] of pairs) {
-    stats.append(el("div", {}, [el("dt", {}, k), el("dd", {}, String(v))]))
-  }
-}
-
-function setStatus(kind, text) {
-  const s = $("status")
-  s.className = `status status--${kind}`
-  s.textContent = text
-}
-
-// ───────────────────────────────────────────────────────────────── the form
-
-function buildVibeChips() {
-  const box = $("vibeChips")
-  for (const v of VIBE_PRESETS) {
+function buildMoods() {
+  const box = $("moodChips")
+  for (const [label, vibe] of MOODS) {
     box.append(el("button", {
-      type: "button", class: "chip", textContent: v, "aria-pressed": "false",
-      onclick: (e) => toggleVibe(e.currentTarget, v),
-    }))
-  }
-}
-
-function toggleVibe(chip, vibe) {
-  const input = $("vibes")
-  const have = input.value.split(",").map((s) => s.trim()).filter(Boolean)
-  const at = have.indexOf(vibe)
-  if (at === -1) have.push(vibe)
-  else have.splice(at, 1)
-  input.value = have.join(", ")
-  chip.setAttribute("aria-pressed", at === -1 ? "true" : "false")
-}
-
-function buildSourceChips() {
-  const box = $("sourceChips")
-  clear(box)
-  for (const id of state.sources) {
-    box.append(el("button", {
-      type: "button", class: "chip", textContent: id, style: srcVar(id),
-      "aria-pressed": "true",
+      type: "button", class: "chip", textContent: label, "aria-pressed": "false",
       onclick: (e) => {
         const on = e.currentTarget.getAttribute("aria-pressed") === "true"
-        // Never let the last source be switched off — an empty fan-out is a
-        // confusing way to say "you unchecked everything".
-        if (on && state.pickedSources.size === 1) return
-        if (on) state.pickedSources.delete(id)
-        else state.pickedSources.add(id)
+        if (on) state.moods.delete(vibe)
+        else state.moods.add(vibe)
         e.currentTarget.setAttribute("aria-pressed", on ? "false" : "true")
-        updateGoSub()
       },
     }))
   }
 }
 
-function updateGoSub() {
-  const n = state.pickedSources.size
-  // Maps takes one browser per keyword, so the real count is higher than the
-  // number of sources; the exact figure arrives with the launching event.
-  $("goSub").textContent = `${n} source${n === 1 ? "" : "s"}, in parallel`
-}
-
-function wireForm() {
-  $("planForm").addEventListener("submit", (e) => {
-    e.preventDefault()
-    if (state.running) return
-    startRun()
-  })
+function wire() {
+  $("planForm").addEventListener("submit", (e) => { e.preventDefault(); if (!state.running) start() })
+  $("restart").addEventListener("click", () => { screen("landing"); $("city").focus() })
   $("explainToggle").addEventListener("change", (e) => {
     state.explain = e.currentTarget.checked
-    if (state.itinerary) renderItinerary(state.itinerary)
+    if (state.itinerary) renderPlan(state.itinerary)
   })
+  for (const id of ["aboutOpen", "aboutOpen2"]) $(id).addEventListener("click", showAbout)
   $("modalClose").addEventListener("click", closeModal)
   $("modal").addEventListener("click", (e) => { if (e.target === $("modal")) closeModal() })
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal() })
 }
 
+function showError(message) {
+  const box = $("formError")
+  box.textContent = message
+  box.hidden = false
+  screen("landing")
+}
+
 // ─────────────────────────────────────────────────────────────── running
 
-function startRun() {
-  const q = new URLSearchParams({
-    city: $("city").value.trim(),
-    vibes: $("vibes").value.trim(),
-    budget: $("budget").value,
-    adults: $("adults").value,
-    kids: $("kids").value,
-    mobility: $("mobility").value,
-    concurrency: $("concurrency").value,
-    retries: $("retries").value,
-    sources: [...state.pickedSources].join(","),
-    record: $("record").checked ? "1" : "0",
-    writeup: $("writeup").checked ? "1" : "0",
-  })
-  const ask = $("ask").value.trim()
-  if (ask) q.set("ask", ask)
+function start() {
+  const city = $("city").value.trim()
+  if (!city) return
 
-  resetStage()
+  // Recording is on by default here. It costs nothing extra to run and it is
+  // what makes "Watch it get found" work — being able to replay the session
+  // that produced a recommendation is the whole provenance argument, and it
+  // is worth more than an option nobody would think to tick.
+  const q = new URLSearchParams({
+    city, vibes: [...state.moods].join(","), budget: "300", record: "1",
+  })
+
   state.running = true
-  state.recording = $("record").checked
   state.t0 = performance.now()
-  $("go").disabled = true
+  state.lanes.clear(); state.laneEls.clear()
+  state.span = 20_000
+  state.catalogue = []; state.planned.clear(); state.expanded.clear(); state.filter = "all"
+  state.gathered = null; state.screened = null
+  clear($("lanes")); clear($("terms"))
+  $("writeupBlock").hidden = true
   $("formError").hidden = true
-  setStatus("live", "geocoding")
+  $("go").disabled = true
+  $("readoutPlace").textContent = "locating…"
+  $("readoutCoords").textContent = "—"
+  $("readoutCount").textContent = "0"
+  screen("working")
 
   const stream = new EventSource(`/api/plan?${q}`)
   state.stream = stream
-  stream.onmessage = (msg) => {
-    let event
-    try { event = JSON.parse(msg.data) } catch { return }
-    handle(event)
-  }
+  stream.onmessage = (m) => { try { handle(JSON.parse(m.data)) } catch { /* keep the stream alive */ } }
   stream.onerror = () => {
-    // EventSource retries by default; the run is not resumable, so stop.
     stream.close()
-    if (state.running) finishRun("err", "connection lost")
+    if (state.running) {
+      state.running = false
+      $("go").disabled = false
+      showError("Lost the connection mid-search. Try again.")
+    }
   }
   tick()
-}
-
-function resetStage() {
-  $("empty").hidden = true
-  for (const id of ["stepKeywords", "stepFanout", "stepPlan", "stepWriteup"]) $(id).hidden = true
-  $("geo").hidden = true
-  $("fanoutStats").hidden = true
-  clear($("lanes")); clear($("axis")); clear($("keywords"))
-  clear($("planDays")); clear($("planFoot")); clear($("writeup"))
-  state.lanes.clear(); state.laneEls.clear()
-  state.itinerary = null
-  state.span = 20_000
-}
-
-function finishRun(kind, text) {
-  state.running = false
-  $("go").disabled = false
-  setStatus(kind, text)
-  state.stream?.close()
-  drawGantt()
 }
 
 function handle(e) {
@@ -252,356 +196,247 @@ function handle(e) {
     case "keywords": onKeywords(e.keywords); break
     case "launching": onLaunching(e); break
     case "pool": onPool(e.at, e.event); break
-    case "reddit": onReddit(e); break
-    case "gathered": onGathered(e); break
-    case "screened": onScreened(e.summary); break
-    case "itinerary": state.itinerary = e.itinerary; renderItinerary(e.itinerary); break
-    case "taste": renderTaste(e.weights, state.weights); state.weights = e.weights; break
-    case "writeup": $("stepWriteup").hidden = false; $("writeup").textContent = e.text; break
-    case "error": showError(e.message); finishRun("err", "failed"); break
-    case "done": finishRun("done", "done"); refreshState(); break
+    case "gathered": state.gathered = e; break
+    case "screened": state.screened = e.summary; break
+    case "ranked": state.catalogue = e.top; break
+    case "itinerary": onItinerary(e.itinerary); break
+    case "taste": state.weights = e.weights; renderTaste(e.weights); break
+    case "writeup": $("writeupBlock").hidden = false; $("writeup").textContent = e.text; break
+    case "error": state.running = false; $("go").disabled = false; showError(e.message); break
+    case "done": finish(); break
     default: break
   }
 }
 
-function showError(message) {
-  const box = $("formError")
-  box.textContent = message
-  box.hidden = false
+function finish() {
+  state.running = false
+  $("go").disabled = false
+  state.stream?.close()
+  renderRig()
 }
-
-async function refreshState() {
-  try {
-    const s = await (await fetch("/api/state")).json()
-    renderStats(s.counts)
-    renderRuns(s.runs)
-    renderSignals(s.signals)
-  } catch { /* the plan is already on screen; a stale counter is not worth an alarm */ }
-}
-
-// ────────────────────────────────────────────────────────── stage 1: place
 
 function onPlace(e) {
-  setStatus("live", "launching")
-  const geo = $("geo")
-  clear(geo)
-  geo.hidden = false
-  geo.append(
-    el("span", { class: "label" }, "target"),
-    el("span", {}, e.place.label),
-    el("span", { class: "sep" }, "│"),
-    el("span", { class: "label" }, "coords"),
-    el("span", {}, `${e.place.lat.toFixed(4)}, ${e.place.lng.toFixed(4)}`),
-    el("span", { class: "sep" }, "│"),
-    el("span", { class: "label" }, "tz"),
-    el("span", {}, e.place.timezone),
-    el("span", { class: "sep" }, "│"),
-    el("span", { id: "geoCount" }, "0 browsers verified in position"),
-  )
-  if (e.alternates?.length) {
-    geo.append(el("span", { class: "sep" }, "│"),
-      el("span", { style: "color:var(--dim)" }, `also matched ${e.alternates.map((a) => a.label).join(", ")}`))
-  }
-  if (e.askNote) {
-    geo.append(el("span", { class: "sep" }, "│"), el("span", { class: "label" }, "read as"), el("span", {}, e.askNote))
-  }
-  $("stepFanout").hidden = false
+  state.place = e.place
+  $("readoutPlace").textContent = e.place.label
+  $("readoutCoords").textContent =
+    `${e.place.lat.toFixed(4)}, ${e.place.lng.toFixed(4)}  ·  ${e.place.timezone}`
 }
-
-// ──────────────────────────────────────────────────────── stage 1: keywords
 
 function onKeywords(keywords) {
-  const list = $("keywords")
-  clear(list)
+  const box = $("terms")
+  clear(box)
   keywords.forEach((k, i) => {
-    list.append(el("li", { style: `animation-delay:${i * 28}ms` }, [
-      el("span", { class: "term" }, k.term),
-      el("span", { class: "because" }, k.because),
-    ]))
+    box.append(el("span", {
+      class: "term", style: `animation-delay:${i * 40}ms`, title: k.because,
+    }, el("b", {}, k.term)))
   })
-  $("stepKeywords").hidden = false
 }
 
-// ───────────────────────────────────────────────────────── stage 2: fan-out
+// ── the fan-out ──────────────────────────────────────────────────────────
 
 function onLaunching(e) {
   state.recording = e.recording
   const lanes = $("lanes")
   clear(lanes)
   for (const id of e.sources) {
-    state.lanes.set(id, { id, at: null, gatedAt: null, endAt: null, found: null, status: "queued", retries: 0 })
+    state.lanes.set(id, {
+      id, at: null, gatedAt: null, endAt: null, found: null,
+      status: "queued", shards: 0, gated: 0,
+    })
     const gate = el("div", { class: "bar-gate" })
     const work = el("div", { class: "bar-work" })
     const bar = el("div", { class: "lane-bar", style: "left:0;width:0" }, [gate, work])
     const out = el("div", { class: "lane-out" }, "queued")
-    const row = el("div", { class: "lane", style: srcVar(id) }, [
-      el("div", { class: "lane-name" }, [el("span", { class: "lane-dot" }), id]),
+    const row = el("div", { class: "lane" }, [
+      el("div", { class: "lane-name" }, id),
       el("div", { class: "lane-track" }, bar),
       out,
     ])
     lanes.append(row)
-    state.laneEls.set(id, { row, bar, gate, work, out })
+    state.laneEls.set(id, { row, bar, gate, out })
   }
-  $("stepFanout").hidden = false
 }
 
 function onPool(at, ev) {
   const lane = state.lanes.get(ev.source)
   if (!lane) return
+  // A source can now be several browsers. The lane shows the source's whole
+  // span — first launch to last finish — and counts how many of its browsers
+  // are in position, which is what someone waiting actually wants to know.
   switch (ev.type) {
     case "launch":
-      lane.at = at; lane.gatedAt = null; lane.endAt = null; lane.status = "launching"
+      if (lane.at === null) lane.at = at
+      lane.shards++
+      lane.status = "launching"
       break
     case "gated":
-      lane.gatedAt = at; lane.status = "running"; lane.sessionId = ev.sessionId
+      lane.gatedAt = lane.gatedAt ?? at
+      lane.gated++
+      lane.status = "running"
       break
     case "done":
-      lane.endAt = at; lane.found = ev.found; lane.status = "done"
-      break
-    case "retry":
-      lane.retries++; lane.status = "retry"; lane.reason = ev.reason
+      lane.endAt = at
+      lane.found = (lane.found ?? 0) + ev.found
+      lane.status = "done"
       break
     case "fail":
-      lane.endAt = at; lane.status = "failed"; lane.reason = ev.reason
+      lane.endAt = at
+      if (!lane.found) lane.status = "failed"
       break
     default:
       return
   }
-  const verified = [...state.lanes.values()].filter((l) => l.gatedAt !== null).length
-  const counter = $("geoCount")
-  if (counter) {
-    counter.textContent = `${verified}/${state.lanes.size} browsers verified in position`
-  }
-
-  // Keep the header honest about which phase we're in. It used to say
-  // "launching" for the whole fan-out, including the ninety seconds a slow
-  // source can spend reading.
-  const finished = [...state.lanes.values()].filter((l) => l.endAt !== null).length
-  if (state.running) {
-    setStatus("live", finished > 0
-      ? `${finished}/${state.lanes.size} sources in`
-      : verified === state.lanes.size ? "reading" : "taking position")
-  }
-  drawGantt()
+  const gated = [...state.lanes.values()].reduce((n, l) => n + l.gated, 0)
+  $("readoutCount").textContent = String(gated)
+  draw()
 }
 
-function onReddit(e) {
-  if (e.found === 0 && !e.configured) return
-  const lanes = $("lanes")
-  const note = e.found > 0
-    ? `reddit — ${e.found} found via the official API (no browser)`
-    : "reddit — skipped, no REDDIT_CLIENT_ID"
-  lanes.append(el("div", { class: "lane", style: srcVar("reddit") }, [
-    el("div", { class: "lane-name" }, [el("span", { class: "lane-dot" }), "reddit"]),
-    el("div", { style: "font-size:12px;color:var(--dim)" }, note),
-    el("div", {}),
-  ]))
-}
-
-/** Pick a round time axis that only ever grows, so bars never jump backwards. */
 function niceSpan(ms) {
-  for (const s of [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300]) {
-    if (ms <= s * 1000) return s * 1000
-  }
-  return Math.ceil(ms / 60_000) * 60_000
+  for (const s of [10, 15, 20, 25, 30, 45, 60, 90, 120]) if (ms <= s * 1000) return s * 1000
+  return Math.ceil(ms / 30_000) * 30_000
 }
 
-function drawGantt() {
+function draw() {
   const now = state.running ? performance.now() - state.t0 : 0
   let maxEnd = now
   for (const l of state.lanes.values()) maxEnd = Math.max(maxEnd, l.endAt ?? 0)
-  state.span = Math.max(state.span, niceSpan(maxEnd * 1.04 || 5000))
+  state.span = Math.max(state.span, niceSpan(maxEnd * 1.05 || 10_000))
 
   for (const [id, lane] of state.lanes) {
     const dom = state.laneEls.get(id)
     if (!dom) continue
     const pct = (ms) => `${Math.max(0, Math.min(100, (ms / state.span) * 100))}%`
+    if (lane.at === null) { dom.bar.style.width = "0"; continue }
 
-    if (lane.at === null) {
-      dom.bar.style.width = "0"
-      dom.out.textContent = "queued"
-      continue
-    }
     const end = lane.endAt ?? (state.running ? now : lane.at)
     dom.bar.style.left = pct(lane.at)
     dom.bar.style.width = pct(Math.max(0, end - lane.at))
-    // The striped head of the bar is "getting into position" — launch plus the
-    // geolocation gate. The solid remainder is the source actually reading.
     const gateMs = (lane.gatedAt ?? end) - lane.at
-    const totalMs = Math.max(1, end - lane.at)
-    dom.gate.style.width = `${Math.min(100, (gateMs / totalMs) * 100)}%`
-
-    dom.row.classList.toggle("running", lane.status === "running" || lane.status === "launching")
+    dom.gate.style.width = `${Math.min(100, (gateMs / Math.max(1, end - lane.at)) * 100)}%`
+    dom.row.classList.toggle("running", lane.status === "launching" || lane.status === "running")
     dom.row.classList.toggle("failed", lane.status === "failed")
 
     clear(dom.out)
-    if (lane.status === "done") {
-      dom.out.append(
-        el("span", { class: "n" }, String(lane.found)),
-        " found ",
-        el("span", { class: "t" }, secs(lane.endAt)),
-      )
+    if (lane.found !== null) {
+      dom.out.append(el("b", {}, String(lane.found)), " found")
     } else if (lane.status === "failed") {
-      dom.out.append(el("span", { class: "err" }, "failed "), el("span", { class: "t" }, secs(lane.endAt)))
-      dom.out.title = lane.reason ?? ""
-    } else if (lane.status === "retry") {
-      dom.out.append(el("span", { class: "t" }, `retry ${lane.retries}`))
-      dom.out.title = lane.reason ?? ""
-    } else if (lane.gatedAt !== null) {
-      dom.out.append(el("span", { class: "verified" }, "✓ in position"))
+      dom.out.append(el("span", { class: "bad" }, "no answer"))
+    } else if (lane.gated > 0) {
+      dom.out.append(el("span", { class: "ok" }, `${lane.gated}/${lane.shards} in position`))
     } else {
-      dom.out.append(el("span", { class: "t" }, "launching…"))
+      dom.out.append("launching…")
     }
-  }
-
-  const axis = $("axis")
-  clear(axis)
-  for (let i = 0; i <= 4; i++) {
-    axis.append(el("span", { style: `left:${(i / 4) * 100}%` }, `${((state.span / 4) * i / 1000).toFixed(0)}s`))
   }
 }
 
 function tick() {
   if (!state.running) return
-  drawGantt()
+  draw()
   requestAnimationFrame(tick)
 }
 
-function onGathered(e) {
-  setStatus("live", "ranking")
-  const box = $("fanoutStats")
-  clear(box)
-  box.hidden = false
+// ── results ──────────────────────────────────────────────────────────────
 
-  const saved = e.sequentialMs - e.elapsedMs
-  const stat = (v, k, cls, note) => el("div", { class: `stat ${cls ?? ""}` }, [
-    el("div", { class: "stat-v" }, v),
-    el("div", { class: "stat-k" }, k),
-    note ? el("div", { class: "stat-note" }, note) : null,
-  ])
+function onItinerary(it) {
+  state.itinerary = it
+  state.planned = new Set(it.days.flatMap((d) => d.items.map((i) => i.candidate.id)))
+  screen("results")
+  window.scrollTo(0, 0)
 
-  box.append(
-    stat(secs(e.elapsedMs), "wall clock", "stat--hero", `${e.ok} of ${e.of} sources answered`),
-    stat(secs(e.sequentialMs), "same work, one at a time", null,
-      saved > 0 ? `${secs(saved)} of waiting the fan-out removes` : "no measurable saving on this run"),
-    stat(String(e.total), "candidates", null, "before dedupe and ranking"),
-    stat(`${e.of}×`, "browsers", null, state.recording ? "recording on — replays available" : "recording off"),
-  )
+  const bar = $("barCoords")
+  clear(bar)
+  if (state.place) {
+    bar.append(
+      el("b", {}, state.place.label),
+      " · ",
+      el("span", { class: "pin" }, `${state.place.lat.toFixed(4)}, ${state.place.lng.toFixed(4)}`),
+    )
+  }
+
+  renderPlan(it)
+  renderCatalogue()
+  renderTaste(state.weights)
 }
 
-/**
- * What the admission gate did.
- *
- * Rendered next to the fan-out numbers on purpose: "110 candidates" means
- * very little on its own, and the interesting figure is how many of them
- * turned out to be about the right city on the right days.
- */
-function onScreened(s) {
-  const box = $("fanoutStats")
-  const d = s.byDimension
-  const cell = (label, ok, bad, unknown, badWord) =>
-    el("div", { class: "stat" }, [
-      el("div", { class: "stat-v", style: bad > 0 ? "color:var(--red)" : "" }, `${bad}`),
-      el("div", { class: "stat-k" }, `${label} — ${badWord}`),
-      el("div", { class: "stat-note" }, `${ok} confirmed · ${unknown} unknown`),
-    ])
-
-  box.append(
-    el("div", { class: "stat", style: "flex-basis:100%;border-color:var(--line-2)" }, [
-      el("div", { class: "stat-v" }, `${s.admitted} admitted`),
-      el("div", { class: "stat-k" }, `relevance gate — ${s.rejected} rejected of ${s.total}`),
-      el("div", { class: "stat-note" },
-        "every candidate, every source: is it near this city, on these days, and a thing you'd go and do?"),
-    ]),
-    cell("place", d.place.ok, d.place.fail, d.place.unknown, "elsewhere"),
-    cell("time", d.time.ok, d.time.fail, d.time.unknown, "other dates"),
-    cell("kind", d.kind.ok, d.kind.fail, d.kind.unknown, "filtered out"),
-  )
-}
-
-// ──────────────────────────────────────────────────────── stage 3: the plan
-
-function renderItinerary(it) {
-  const host = $("planDays")
+function renderPlan(it) {
+  const host = $("days")
   clear(host)
-  $("stepPlan").hidden = false
-  setStatus(state.running ? "live" : "done", state.running ? "writing up" : "done")
+  $("planMeta").textContent = state.place ? state.place.label : ""
 
   let pin = 0
   const pins = []
 
   it.days.forEach((day, dayIdx) => {
     const date = new Date(`${day.date}T12:00:00`)
-    const name = date.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })
+    const name = date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })
     const w = day.weather
     const wet = w ? w.precipChance >= 60 : false
 
-    const head = el("div", { class: "day-head" }, [
-      el("span", { class: "day-name" }, name),
-      w ? el("span", { class: `day-wx ${wet ? "wet" : ""}` },
-        `${w.highF}°/${w.lowF}°F · ${w.summary} · ${w.precipChance}% rain`) : null,
-      el("span", { class: "day-cost" }, `$${Math.round(day.costUsd)}`),
-    ])
-
-    const items = el("div", { class: "items" })
-    if (day.items.length === 0) {
-      items.append(el("div", { class: "item-why", style: "padding:10px" },
-        "Nothing left that fit the budget — try raising it or widening the vibes."))
-    }
+    const slots = el("div", {})
     for (const item of day.items) {
       pin++
       const c = item.candidate
       if (c.lat !== null && c.lng !== null) pins.push({ ...c, pin, day: dayIdx, slot: item.slot })
-      items.append(renderItem(item, pin, dayIdx))
+      slots.append(renderSlot(item, pin))
+    }
+    if (day.items.length === 0) {
+      slots.append(el("p", { class: "slot-why", style: "padding:16px 0" },
+        "Nothing here fit. Try a different mood, or a bigger budget."))
     }
 
-    host.append(el("section", {}, [head, items]))
+    host.append(el("section", {}, [
+      el("div", { class: "day-head" }, [
+        el("span", { class: "day-name" }, name),
+        w ? el("span", { class: `day-wx ${wet ? "wet" : ""}` },
+          `${w.highF}° · ${w.summary} · ${w.precipChance}% rain`) : null,
+        day.costUsd > 0 ? el("span", { class: "day-cost" }, `$${Math.round(day.costUsd)}`) : null,
+      ]),
+      slots,
+    ]))
   })
 
   const foot = $("planFoot")
   clear(foot)
   foot.append(
     el("span", { class: "plan-total" }, `$${Math.round(it.totalUsd)}`),
-    el("span", {}, `of $${it.budgetUsd} budget`),
+    el("span", {}, `of the $${it.budgetUsd} you had in mind`),
     ...it.notes.map((n) => el("span", { class: "plan-note" }, n)),
   )
 
   renderMap(pins)
 }
 
-function renderItem(item, pin, dayIdx) {
+function renderSlot(item, pin) {
   const c = item.candidate
-  const meta = el("div", { class: "item-meta" }, [
-    el("span", { class: `tag tag--price ${c.priceUsd === 0 ? "tag--free" : ""}` }, money(c.priceUsd)),
-    el("span", { class: "tag" }, c.category),
-    el("span", { class: "tag tag--src", style: srcVar(c.source) }, c.source),
+  const price = money(c.priceUsd)
+
+  const facts = el("div", { class: "facts" }, [
+    price ? el("span", { class: `tag ${c.priceUsd === 0 ? "tag--free" : ""}` }, price) : null,
+    el("span", { class: "tag tag--cat" }, CATEGORY_LABEL[c.category] ?? c.category),
+    c.rating !== null
+      ? el("span", { class: "tag tag--rating" },
+          `${c.rating}★${c.reviewCount ? ` · ${c.reviewCount.toLocaleString()}` : ""}`)
+      : null,
     c.corroboration > 1
       ? el("button", {
-          class: "tag tag--corr", type: "button",
+          class: "tag tag--agree", type: "button",
           title: "which sources found this, and what each one said",
           onclick: () => showSightings(c),
         }, `${c.corroboration} sources agree`)
       : null,
-    c.rating !== null
-      ? el("span", { class: "tag" }, `${c.rating}★${c.reviewCount ? ` · ${c.reviewCount.toLocaleString()}` : ""}`)
-      : null,
-    item.hopMiles !== null ? el("span", { class: "tag tag--hop" }, `${item.hopMiles.toFixed(1)} mi hop`) : null,
+    item.hopMiles !== null ? el("span", { class: "tag tag--far" }, `${item.hopMiles.toFixed(1)} mi away`) : null,
   ])
 
-  const body = el("div", {}, [
-    el("div", { class: "item-title" }, c.url ? el("a", { href: c.url, target: "_blank", rel: "noreferrer" }, c.title) : c.title),
-    meta,
-    el("div", { class: "item-why" }, item.why),
-    state.explain ? renderComponents(c.components) : null,
-    renderActions(c),
-  ])
-
-  return el("div", { class: "item" }, [
-    el("div", { class: "item-slot" }, [
-      el("span", { class: `item-pin ${dayIdx === 1 ? "day2" : ""}`, style: dayIdx === 1 ? "background:var(--blue)" : "" }, String(pin)),
-      item.slot,
+  return el("div", { class: "slot" }, [
+    el("div", { class: "slot-when" }, [el("b", {}, SLOT_TIME[item.slot] ?? ""), item.slot]),
+    el("div", {}, [
+      el("div", { class: "slot-title" },
+        c.url ? el("a", { href: c.url, target: "_blank", rel: "noreferrer" }, c.title) : c.title),
+      facts,
+      el("div", { class: "slot-why" }, item.why),
+      state.explain ? renderComponents(c.components) : null,
+      renderActs(c),
     ]),
-    body,
   ])
 }
 
@@ -609,37 +444,30 @@ function renderComponents(components) {
   const box = el("div", { class: "components" })
   for (const comp of components) {
     box.append(el("div", {}, [
-      el("span", { class: `pts ${comp.points > 0 ? "pos" : "neg"}` }, `${comp.points > 0 ? "+" : ""}${comp.points.toFixed(1)}`),
-      el("span", { class: "nm" }, comp.name),
+      el("span", { class: `pts ${comp.points > 0 ? "pos" : "neg"}` },
+        `${comp.points > 0 ? "+" : ""}${comp.points.toFixed(1)}`),
+      el("span", {}, comp.name),
       el("span", {}, comp.why),
     ]))
   }
   return box
 }
 
-function renderActions(c) {
+function renderActs(c) {
   const current = state.feedback.get(c.id)
-  const box = el("div", { class: "item-actions" })
-
-  const thumb = (kind, label, cls) =>
-    el("button", {
-      type: "button",
-      class: `act ${cls} ${current === kind ? "on" : ""}`,
-      textContent: label,
-      onclick: () => sendFeedback(c, kind, undefined, current === kind),
-    })
-
-  box.append(
-    thumb("kept", "👍 keep", "act--good"),
-    thumb("skipped", "👎 not this", "act--bad"),
-    thumb("did", "✓ we went", "act--good"),
-  )
+  const box = el("div", { class: "acts" })
+  const thumb = (kind, label) => el("button", {
+    type: "button", class: `act ${current === kind ? "on" : ""}`, textContent: label,
+    onclick: () => sendFeedback(c, kind, undefined, current === kind),
+  })
+  box.append(thumb("kept", "Keep it"), thumb("skipped", "Not this"), thumb("did", "We went"))
 
   const stars = el("span", { class: "stars" })
   const rated = state.ratings.get(c.id) ?? 0
   for (let n = 1; n <= 5; n++) {
     stars.append(el("button", {
-      type: "button", class: `star ${n <= rated ? "lit" : ""}`, textContent: "★", title: `rate ${n}/5`,
+      type: "button", class: `star ${n <= rated ? "lit" : ""}`, textContent: "★",
+      title: `rate ${n} of 5`,
       onclick: () => sendFeedback(c, "rated", n, false),
     }))
   }
@@ -647,11 +475,162 @@ function renderActions(c) {
 
   if (state.recording && c.sessionId) {
     box.append(el("button", {
-      type: "button", class: "act act--ghost", textContent: "▶ replay how it was found",
+      type: "button", class: "act act--ghost", textContent: "Watch it get found",
       onclick: () => showReplay(c.sessionId, c.title),
     }))
   }
   return box
+}
+
+// ── the catalogue: everything that didn't make the plan ──────────────────
+
+function renderCatalogue() {
+  const rest = state.catalogue.filter((c) => !state.planned.has(c.id))
+  $("catCount").textContent = `${rest.length} more in ${state.place?.city ?? "town"}`
+
+  const byCat = new Map()
+  for (const c of rest) {
+    const list = byCat.get(c.category) ?? []
+    list.push(c)
+    byCat.set(c.category, list)
+  }
+  const order = [...byCat.entries()].sort((a, b) => b[1].length - a[1].length)
+
+  const filters = $("filters")
+  clear(filters)
+  const chip = (key, label, n) => el("button", {
+    type: "button", class: "filter", "aria-pressed": String(state.filter === key),
+    onclick: () => { state.filter = key; renderCatalogue() },
+  }, [label, el("i", {}, String(n))])
+  filters.append(chip("all", "everything", rest.length))
+  for (const [cat, list] of order) filters.append(chip(cat, CATEGORY_LABEL[cat] ?? cat, list.length))
+
+  const groups = $("groups")
+  clear(groups)
+  const shown = state.filter === "all" ? order : order.filter(([cat]) => cat === state.filter)
+  if (shown.length === 0) {
+    groups.append(el("p", { class: "taste-empty" }, "Nothing in that category this weekend."))
+    return
+  }
+  for (const [cat, list] of shown) {
+    // Picking a single category is itself a request to see all of it.
+    const open = state.expanded.has(cat) || state.filter === cat
+    const visible = open ? list : list.slice(0, 6)
+    const rows = el("div", { class: "rows" }, visible.map(rowFor))
+    if (!open && list.length > visible.length) {
+      rows.append(el("button", {
+        class: "more", type: "button",
+        textContent: `Show all ${list.length} — ${CATEGORY_LABEL[cat] ?? cat}`,
+        onclick: () => { state.expanded.add(cat); renderCatalogue() },
+      }))
+    }
+    groups.append(el("section", {}, [
+      el("h3", { class: "group-head" }, [CATEGORY_LABEL[cat] ?? cat, el("span", {}, String(list.length))]),
+      rows,
+    ]))
+  }
+}
+
+function rowFor(c) {
+  const price = money(c.priceUsd)
+  return el("div", { class: "row", onclick: () => showSightings(c) }, [
+    el("div", { class: "row-name" }, [
+      c.title,
+      c.corroboration > 1 ? el("em", {}, `${c.corroboration} sources`) : null,
+    ]),
+    el("div", { class: "row-facts" }, [
+      c.rating !== null ? el("span", { class: "r" }, `${c.rating}★`) : null,
+      c.reviewCount ? el("span", {}, c.reviewCount.toLocaleString()) : null,
+      price ? el("span", { class: c.priceUsd === 0 ? "p" : "" }, price) : null,
+      el("span", {}, c.source),
+    ]),
+  ])
+}
+
+// ── the rig ──────────────────────────────────────────────────────────────
+
+function renderRig() {
+  const g = state.gathered
+  const s = state.screened
+  if (!g) return
+
+  $("rigSummary").textContent = `${g.of} sources · ${g.ok} answered · ${secs(g.elapsedMs)}`
+
+  const stats = $("rigStats")
+  clear(stats)
+  const stat = (v, k, note, hero) => el("div", { class: `stat ${hero ? "stat--hero" : ""}` }, [
+    el("div", { class: "stat-v" }, v),
+    el("div", { class: "stat-k" }, k),
+    note ? el("div", { class: "stat-note" }, note) : null,
+  ])
+  stats.append(
+    stat(secs(g.elapsedMs), "wall clock", `${g.ok} of ${g.of} sources answered inside the deadline`, true),
+    stat(secs(g.sequentialMs), "one at a time", "the same work, run in sequence"),
+    stat(String(g.total), "listings read", "before screening and ranking"),
+  )
+
+  if (s) {
+    const gate = $("rigGate")
+    clear(gate)
+    gate.append(
+      el("div", {}, [el("b", {}, `${s.admitted} admitted`), `, ${s.rejected} rejected of ${s.total}.`]),
+      el("div", {}, [
+        "place — ", el("span", { class: "ok" }, `${s.byDimension.place.ok} confirmed`), ", ",
+        el("span", { class: "bad" }, `${s.byDimension.place.fail} elsewhere`),
+        `, ${s.byDimension.place.unknown} published no location at all.`,
+      ]),
+      el("div", {}, [
+        "dates — ", el("span", { class: "ok" }, `${s.byDimension.time.ok} on your days`), ", ",
+        el("span", { class: "bad" }, `${s.byDimension.time.fail} on other dates`), ".",
+      ]),
+      el("div", {}, [
+        "kind — ", el("span", { class: "bad" }, `${s.byDimension.kind.fail} filtered`),
+        " as business listings, admin, or a broken scrape.",
+      ]),
+    )
+  }
+
+  // The same lanes, no longer live. Cloned rather than re-rendered so the
+  // finished timing is exactly what was on screen while you waited.
+  const target = $("lanesStatic")
+  clear(target)
+  for (const node of $("lanes").children) target.append(node.cloneNode(true))
+}
+
+// ── taste ────────────────────────────────────────────────────────────────
+
+function renderTaste(weights) {
+  const host = $("taste")
+  clear(host)
+  const cats = Object.entries(weights ?? {})
+    .filter(([k]) => k.startsWith("cat:"))
+    .map(([k, v]) => [k.slice(4), v])
+    .filter(([, v]) => Math.abs(v - 1) > 0.02)
+    .sort((a, b) => b[1] - a[1])
+
+  if (cats.length === 0) {
+    host.append(el("p", { class: "taste-empty" },
+      "Nothing yet. Keep or skip anything above and the next weekend in this town comes back different — same browsers, ranked by what you actually liked."))
+    return
+  }
+  // The learner clamps weights to [0.4, 1.8] with 1.0 neutral, so the bar is
+  // drawn against that fixed scale rather than the visible range — otherwise
+  // a tiny preference would look like a strong one.
+  const MIN = 0.4, MAX = 1.8, mid = (1 - MIN) / (MAX - MIN)
+  for (const [name, v] of cats) {
+    const at = (v - MIN) / (MAX - MIN)
+    const up = v > 1
+    host.append(el("div", { class: "weight" }, [
+      el("span", { class: "weight-name" }, CATEGORY_LABEL[name] ?? name),
+      el("span", { class: "weight-bar" }, el("span", {
+        class: `weight-fill ${up ? "up" : "down"}`,
+        style: up
+          ? `left:${mid * 100}%;width:${(at - mid) * 100}%`
+          : `left:${at * 100}%;width:${(mid - at) * 100}%`,
+      })),
+      el("span", { class: "weight-val" }, v.toFixed(2)),
+    ]))
+  }
 }
 
 async function sendFeedback(c, kind, value, undo) {
@@ -662,96 +641,18 @@ async function sendFeedback(c, kind, value, undo) {
       body: JSON.stringify({ candidateId: c.id, kind, value, undo }),
     })
     const out = await res.json()
-    if (!res.ok) { showError(out.error ?? "feedback failed"); return }
-
+    if (!res.ok) return
     if (undo) state.feedback.delete(c.id)
     else if (kind === "rated") state.ratings.set(c.id, value)
     else state.feedback.set(c.id, kind)
-
-    renderTaste(out.weights, state.weights)
     state.weights = out.weights
-    renderSignals(out.signals)
-    if (state.itinerary) renderItinerary(state.itinerary)
-    refreshState()
-  } catch (err) {
-    showError(String(err))
-  }
+    renderTaste(out.weights)
+    if (state.itinerary) renderPlan(state.itinerary)
+  } catch { /* the plan is on screen; a failed thumb is not worth an alarm */ }
 }
 
-// ─────────────────────────────────────────────────────────────────── taste
+// ── map ──────────────────────────────────────────────────────────────────
 
-function renderTaste(weights, previous) {
-  const host = $("taste")
-  clear(host)
-
-  const cats = Object.entries(weights)
-    .filter(([k]) => k.startsWith("cat:"))
-    .map(([k, v]) => [k.slice(4), v])
-    .filter(([, v]) => Math.abs(v - 1) > 0.02)
-    .sort((a, b) => b[1] - a[1])
-
-  if (cats.length === 0) {
-    host.append(el("div", { class: "taste-empty" },
-      "Nothing learned yet. Rate anything in a plan and the weights move — then run the same city again and watch the order change."))
-    return
-  }
-
-  // The learner clamps weights to [0.4, 1.8] with 1.0 neutral, so the bar is
-  // drawn against that fixed scale rather than against the visible range —
-  // otherwise a tiny preference would look like a strong one.
-  const MIN = 0.4, MAX = 1.8, mid = (1 - MIN) / (MAX - MIN)
-  for (const [name, v] of cats) {
-    const at = (v - MIN) / (MAX - MIN)
-    const up = v > 1
-    const changed = previous && previous[`cat:${name}`] !== undefined && Math.abs(previous[`cat:${name}`] - v) > 0.001
-    host.append(el("div", { class: `weight ${changed ? "changed" : ""}` }, [
-      el("span", { class: "weight-name" }, name),
-      el("span", { class: "weight-bar" },
-        el("span", {
-          class: `weight-fill ${up ? "up" : "down"}`,
-          style: up
-            ? `left:${mid * 100}%;width:${(at - mid) * 100}%`
-            : `left:${at * 100}%;width:${(mid - at) * 100}%`,
-        })),
-      el("span", { class: "weight-val" }, v.toFixed(2)),
-    ]))
-  }
-
-  const free = weights["w:free"]
-  if (free !== undefined && Math.abs(free - 1) > 0.05) {
-    host.append(el("div", { class: "taste-empty", style: "margin-top:4px" },
-      free > 1 ? `Values free things (${free.toFixed(2)})` : `Doesn't mind paying (${free.toFixed(2)})`))
-  }
-}
-
-function renderSignals(signals) {
-  const host = $("signalLog")
-  clear(host)
-  for (const s of signals ?? []) {
-    const good = s.kind === "did" || s.kind === "kept" || (s.kind === "rated" && s.value >= 4)
-    const bad = s.kind === "skipped" || (s.kind === "rated" && s.value <= 2)
-    host.append(el("li", {}, [
-      el("span", { class: `kind ${good ? "good" : bad ? "bad" : ""}` }, s.kind === "rated" ? `${s.value}★` : s.kind),
-      el("span", { class: "what", title: s.title }, s.title),
-    ]))
-  }
-}
-
-function renderRuns(runs) {
-  const host = $("runs")
-  clear(host)
-  for (const r of runs ?? []) {
-    host.append(el("li", {}, [
-      el("span", { class: "when" }, r.created_at.slice(5, 10)),
-      el("span", { class: "where", title: r.place_label }, r.place_label),
-      el("span", { class: "ms" }, secs(r.elapsed_ms)),
-    ]))
-  }
-}
-
-// ────────────────────────────────────────────────────────────────────── map
-
-/** Web Mercator, in tile units at a given zoom. */
 const lonToX = (lon, z) => ((lon + 180) / 360) * 2 ** z
 const latToY = (lat, z) => {
   const r = (lat * Math.PI) / 180
@@ -761,53 +662,45 @@ const latToY = (lat, z) => {
 /**
  * A slippy map in about eighty lines.
  *
- * Deliberately not a mapping library: the whole job is "put six dots on a
- * street grid and join them up", and Leaflet is 140KB to do it. Tiles are
- * plain `<img>` elements, CSS-inverted to sit in a dark page, and if they
- * fail to load the dots and the routes are still readable on the panel
- * background — which is most of the information anyway.
+ * Not a mapping library: the job is "put six dots on a street grid and join
+ * them up", and Leaflet is 140KB to do it. Tiles are plain <img> elements,
+ * CSS-filtered onto the warm dark ground; if they fail to load, the dots and
+ * the route are still readable, which is most of the information anyway.
  */
 function renderMap(points) {
   const host = $("map")
   clear(host)
-
-  const legend = $("mapLegend")
-  clear(legend)
+  const note = $("mapNote")
 
   if (points.length === 0) {
     host.append(el("div", { class: "map-empty" },
-      "No coordinates on this plan. Google Maps is the only source that publishes them, so the map fills in as it contributes venues."))
+      "No coordinates on this plan yet. Google Maps is the only source that publishes them, so the map fills in as it contributes places."))
+    note.textContent = ""
     return
   }
 
-  const W = host.clientWidth || 380
-  const H = host.clientHeight || 430
-  const PAD = 46
-
+  const W = host.clientWidth || 820
+  const H = host.clientHeight || 380
+  const PAD = 54
   const lats = points.map((p) => p.lat)
   const lngs = points.map((p) => p.lng)
-  const bounds = { n: Math.max(...lats), s: Math.min(...lats), e: Math.max(...lngs), w: Math.min(...lngs) }
+  const b = { n: Math.max(...lats), s: Math.min(...lats), e: Math.max(...lngs), w: Math.min(...lngs) }
 
-  // Largest zoom whose bounding box still fits inside the viewport.
   let z = 16
   for (; z > 2; z--) {
-    const dx = (lonToX(bounds.e, z) - lonToX(bounds.w, z)) * 256
-    const dy = (latToY(bounds.s, z) - latToY(bounds.n, z)) * 256
+    const dx = (lonToX(b.e, z) - lonToX(b.w, z)) * 256
+    const dy = (latToY(b.s, z) - latToY(b.n, z)) * 256
     if (dx <= W - PAD * 2 && dy <= H - PAD * 2) break
   }
-
-  const cx = lonToX((bounds.e + bounds.w) / 2, z)
-  const cy = latToY((bounds.n + bounds.s) / 2, z)
+  const cx = lonToX((b.e + b.w) / 2, z)
+  const cy = latToY((b.n + b.s) / 2, z)
   const px = (p) => (lonToX(p.lng, z) - cx) * 256 + W / 2
   const py = (p) => (latToY(p.lat, z) - cy) * 256 + H / 2
 
-  // Tiles.
   const tiles = el("div", { class: "map-tiles" })
-  const x0 = Math.floor(cx - W / 512), x1 = Math.floor(cx + W / 512)
-  const y0 = Math.floor(cy - H / 512), y1 = Math.floor(cy + H / 512)
   const max = 2 ** z
-  for (let tx = x0; tx <= x1; tx++) {
-    for (let ty = y0; ty <= y1; ty++) {
+  for (let tx = Math.floor(cx - W / 512); tx <= Math.floor(cx + W / 512); tx++) {
+    for (let ty = Math.floor(cy - H / 512); ty <= Math.floor(cy + H / 512); ty++) {
       if (ty < 0 || ty >= max) continue
       const wrapped = ((tx % max) + max) % max
       tiles.append(el("img", {
@@ -820,45 +713,42 @@ function renderMap(points) {
   }
   host.append(tiles)
 
-  // Routes, one path per day.
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
   for (const day of [...new Set(points.map((p) => p.day))]) {
-    const dayPoints = points.filter((p) => p.day === day)
-    if (dayPoints.length < 2) continue
+    const dp = points.filter((p) => p.day === day)
+    if (dp.length < 2) continue
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path")
-    path.setAttribute("d", dayPoints.map((p, i) => `${i ? "L" : "M"}${px(p).toFixed(1)},${py(p).toFixed(1)}`).join(" "))
+    path.setAttribute("d", dp.map((p, i) => `${i ? "L" : "M"}${px(p).toFixed(1)},${py(p).toFixed(1)}`).join(" "))
     path.setAttribute("fill", "none")
-    path.setAttribute("stroke", day === 1 ? "var(--blue)" : "var(--accent)")
+    path.setAttribute("stroke", day === 1 ? "var(--gold)" : "var(--ember)")
     path.setAttribute("stroke-width", "2")
-    path.setAttribute("stroke-dasharray", "5 4")
-    path.setAttribute("opacity", "0.75")
+    path.setAttribute("stroke-dasharray", "6 5")
+    path.setAttribute("opacity", "0.8")
     svg.append(path)
   }
   host.append(svg)
 
-  // Pins.
   for (const p of points) {
     host.append(el("div", {
-      class: `map-pin ${p.day === 1 ? "day2" : ""}`,
+      class: `map-pin ${p.day === 1 ? "d2" : ""}`,
       style: `left:${px(p).toFixed(1)}px;top:${py(p).toFixed(1)}px`,
       title: `${p.slot} · ${p.title}`,
       textContent: String(p.pin),
       onclick: () => showSightings(p),
     }))
   }
-
   host.append(el("a", {
     class: "map-attr", href: "https://www.openstreetmap.org/copyright",
     target: "_blank", rel: "noreferrer", textContent: "© OpenStreetMap",
   }))
 
-  const missing = (state.itinerary?.days.flatMap((d) => d.items).length ?? 0) - points.length
-  legend.textContent = missing > 0
-    ? `${points.length} of ${points.length + missing} stops have coordinates — the rest came from sources that don't publish any.`
-    : `Dashed line is the route, in order. Day two is blue.`
+  const total = state.itinerary?.days.flatMap((d) => d.items).length ?? points.length
+  note.textContent = total > points.length
+    ? `${points.length} of ${total} stops have coordinates — the rest came from sources that don't publish any. Day two is gold.`
+    : "In order, day one then day two. Day two is gold."
 }
 
-// ──────────────────────────────────────────────────────────────────  modal
+// ── modal ────────────────────────────────────────────────────────────────
 
 function openModal(title, body) {
   $("modalTitle").textContent = title
@@ -873,26 +763,42 @@ function closeModal() {
   clear($("modalBody"))
 }
 
+function showAbout() {
+  openModal("How this works", el("div", {}, [
+    el("p", {}, "What's on near you is spread across a dozen sites, and none of them will sell you an API. Every attempt to unify local listings has died on exactly that — you'd have to convince every platform to cooperate."),
+    el("p", {}, "So WeekendFun doesn't ask. It opens real browsers in the cloud, stands them at your coordinates, and reads every source at the same time. A browser is a permissionless interface: if a site has a page, it can be read."),
+    el("h4", {}, "Why standing there matters"),
+    el("p", {}, "The web personalises on where your traffic comes from and what you've clicked before. If you've just moved, both of those are wrong, so it keeps showing you your old life. Every browser here proves where it is before it's allowed to search — which is also why you can plan a weekend in a city you haven't moved to yet."),
+    el("h4", {}, "What decides the plan"),
+    el("p", {}, "Ordinary code, not a model. Independent sources agreeing on a place counts for a lot; so do ratings weighted by how many people left them, whether something is actually on the days you asked about, and the forecast. Open “How this was found” under the plan to see the arithmetic behind every card."),
+    el("h4", {}, "What it remembers"),
+    el("p", {}, "Only what you tell it. Keep or skip anything and the next weekend in that town comes back ranked differently."),
+  ]))
+}
+
 async function showSightings(c) {
-  const body = el("div", {}, el("div", { class: "replay-msg" }, "Loading…"))
+  const body = el("div", {}, el("p", {}, "Loading…"))
   openModal(c.title, body)
   try {
     const data = await (await fetch(`/api/candidate/${encodeURIComponent(c.id)}`)).json()
     clear(body)
     if (!data.sightings?.length) {
-      body.append(el("div", { class: "replay-msg" }, "No stored sightings for this one."))
+      body.append(el("p", {}, "No stored record for this one."))
       return
     }
-    body.append(el("p", { class: "step-why", style: "margin:0 0 12px" },
-      `Corroboration is just this list: ${new Set(data.sightings.map((s) => s.source)).size} independent sources, and what each one actually said.`))
+    const n = new Set(data.sightings.map((s) => s.source)).size
+    body.append(el("p", {},
+      `Found by ${n} independent source${n === 1 ? "" : "s"}. Here's what each one actually said:`))
     for (const s of data.sightings) {
-      body.append(el("div", { class: "sighting", style: srcVar(s.source) }, [
+      body.append(el("div", { class: "sighting" }, [
         el("div", { class: "sighting-head" }, [
           el("span", { class: "sighting-src" }, s.source),
-          s.runs > 1 ? el("span", { class: "tag" }, `found on ${s.runs} runs`) : null,
+          s.runs > 1 ? el("span", { class: "tag" }, `seen on ${s.runs} runs`) : null,
           s.sessionId
-            ? el("button", { class: "act act--ghost", type: "button", textContent: "▶ replay this session",
-                onclick: () => showReplay(s.sessionId, `${c.title} — ${s.source}`) })
+            ? el("button", {
+                class: "act act--ghost", type: "button", textContent: "Watch it get found",
+                onclick: () => showReplay(s.sessionId, `${c.title} — ${s.source}`),
+              })
             : null,
         ]),
         el("div", { class: "sighting-ev" }, s.evidence),
@@ -900,7 +806,7 @@ async function showSightings(c) {
     }
   } catch (err) {
     clear(body)
-    body.append(el("div", { class: "replay-msg" }, String(err)))
+    body.append(el("p", {}, String(err)))
   }
 }
 
@@ -908,19 +814,18 @@ function loadOnce(tag, attrs) {
   const key = attrs.src ?? attrs.href
   if (document.querySelector(`${tag}[data-cdn="${key}"]`)) return Promise.resolve()
   return new Promise((resolve, reject) => {
-    const node = el(tag, { ...attrs, dataset: { cdn: key }, onload: resolve, onerror: reject })
-    document.head.append(node)
+    document.head.append(el(tag, { ...attrs, dataset: { cdn: key }, onload: resolve, onerror: reject }))
   })
 }
 
 /**
- * Play back the actual browser session that found a venue.
+ * Play back the browser session that found a venue.
  *
- * The rrweb player is loaded from a CDN on first use rather than vendored,
- * because it's only reachable from a page you already opened in a browser and
- * nothing else in the repo needs it. If the CDN is unreachable, the panel
- * falls back to what can be read straight out of the event stream — which
- * URLs the session visited, and how long it ran.
+ * The rrweb player loads from a CDN on first use rather than being vendored:
+ * it's only reachable from a page already open in a browser, and nothing else
+ * in the repo needs it. If the CDN is unreachable, fall back to what can be
+ * read straight out of the event stream — which URLs it visited, and for how
+ * long. That's still an honest answer to "where did this come from".
  */
 async function showReplay(sessionId, title) {
   const host = el("div", { class: "replay-host" }, el("div", { class: "replay-msg" }, "Fetching the recording…"))
@@ -938,11 +843,11 @@ async function showReplay(sessionId, title) {
       return
     }
     events = text.split("\n").filter(Boolean).map((line) => {
-      const obj = JSON.parse(line)
-      if (typeof obj.type === "number" && typeof obj.timestamp === "number") return obj
-      // Tolerate a wrapper object without mistaking rrweb's own `data` field
-      // for one: a real event always carries a numeric type and timestamp.
-      for (const v of Object.values(obj)) {
+      const o = JSON.parse(line)
+      if (typeof o.type === "number" && typeof o.timestamp === "number") return o
+      // Tolerate a wrapper without mistaking rrweb's own `data` field for one:
+      // a real event always carries a numeric type and timestamp.
+      for (const v of Object.values(o)) {
         if (v && typeof v.type === "number" && typeof v.timestamp === "number") return v
       }
       return null
@@ -956,7 +861,7 @@ async function showReplay(sessionId, title) {
   if (events.length < 2) {
     clear(host)
     host.append(el("div", { class: "replay-msg" },
-      "The recording has too few events to play. Sessions are only recorded when a run is launched with recording on."))
+      "Too few events to play. Sessions are only recorded when a run asks for it."))
     return
   }
 
@@ -971,13 +876,11 @@ async function showReplay(sessionId, title) {
     const width = Math.min(1000, $("modalBody").clientWidth - 4)
     new Player({ target: host, props: { events, width, height: Math.round(width * 0.56), autoPlay: true, showController: true } })
   } catch {
-    // Honest degradation: say what the recording contains rather than
-    // pretending the feature is broken.
     const urls = [...new Set(events.map((e) => e.data?.href).filter(Boolean))]
     const ms = events[events.length - 1].timestamp - events[0].timestamp
     clear(host)
     host.append(el("div", { class: "replay-msg" }, [
-      el("p", {}, "The rrweb player couldn't be loaded, so here is what the recording holds:"),
+      el("p", {}, "The player couldn't load, so here's what the recording holds:"),
       el("p", {}, el("code", {}, `${events.length.toLocaleString()} events over ${secs(ms)}`)),
       ...urls.slice(0, 6).map((u) => el("p", {}, el("code", {}, u))),
     ]))

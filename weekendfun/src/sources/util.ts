@@ -184,7 +184,11 @@ export function categoryFromMapsType(raw: string): Category | null {
   const s = raw.toLowerCase().trim()
   if (!s) return null
   const table: Array<[RegExp, Category]> = [
-    [/museum|gallery|historical|landmark|monument|tourist attraction|观光/, "culture"],
+    // NOTE: "tourist attraction" is deliberately absent. Maps applies it to
+    // parks, beaches and bowling alleys alike — it is a search-result label,
+    // not a type — and matching it here filed six Palm Coast parks under
+    // culture. Falling through to the name gets "Waterfront Park" right.
+    [/museum|gallery|historical|landmark|monument|观光/, "culture"],
     [/theater|theatre|performing arts|opera|cinema|movie/, "culture"],
     [/live music|concert|music venue|jazz|night club dj/, "music"],
     [/night club|dance club|disco/, "nightlife"],
