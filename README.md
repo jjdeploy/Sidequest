@@ -1,8 +1,12 @@
 # WeekendFun
 
-**Twelve cloud browsers, in parallel, each one standing in your city, arguing about what you should do this weekend. Then it remembers what you actually liked.**
+**It's the weekend and you don't know this town yet.**
 
-Built on [Solari](https://getsolari.com) — a fork of the [Solari cookbook](https://github.com/solari-sdk/solari-cookbook) with a real application on top.
+What's on near you is split across a dozen sites and not one of them will sell you an API. Every attempt to unify local listings has died on exactly that — you'd have to convince every platform to cooperate.
+
+So this doesn't ask. It opens real browsers in the cloud, stands them at your coordinates, and reads all of them at the same time. A browser is a permissionless interface: if a site has a page, it can be read.
+
+A fork of the [Solari cookbook](https://github.com/solari-sdk/solari-cookbook) with a real application on top, built on [Solari](https://getsolari.com).
 
 ### → [**`weekendfun/`**](weekendfun) — the project, and the full write-up
 
@@ -10,49 +14,31 @@ Built on [Solari](https://getsolari.com) — a fork of the [Solari cookbook](htt
 cd weekendfun
 npm install
 cp .env.example .env      # add your SOLARI_API_KEY
-npm run plan -- "Tampa, FL" -- --vibes "chill, live music" --budget 220
-npm run dashboard         # ...or watch it happen, at localhost:5173
+npm run dashboard         # http://localhost:5173
 ```
 
+![The landing page](weekendfun/docs/landing.jpg)
+
+## Thirteen browsers, all standing in your city
+
+![The fan-out](weekendfun/docs/fanout.jpg)
+
+One browser per source — and for Google Maps, one browser per search term. The Starter plan allows twenty concurrent browsers; this uses thirteen and finishes in the time the slowest one takes, with a hard 20-second deadline and partial results treated as normal.
+
+Same Palm Coast query, before and after that change:
+
 ```
-Launching 6 cloud browsers in parallel:
-  ✓ google-maps   in position, verified (2.1s)
-  ✓ groupon       in position, verified (2.4s)
-  ● timeout        20 found (8.3s)
-  ● groupon        27 found (11.7s)
-  ● google-maps    34 found (21.6s)
-
-102 candidates from 6/6 sources in 21.6s
-
-Saturday, Sep 5  85°/78°F, thunderstorms, 66% rain
-────────────────────────────────────────────────────────────────────
-  Morning    Kava Culture Tampa
-             $15      food
-             4.6★ from 600 reviews; indoor, which suits the forecast
-
-  Afternoon  Henry B. Plant Museum
-             —        culture  (0.4 mi hop)
-             3 independent sources found this; indoor, which suits the forecast
-
-  Evening    Bob Ross Sip & Paint Night at Kava Culture Downtown Tampa
-             free     event
-             a dated event, not an everyday venue; free
+92.8s   29 candidates   1/6 sources   place: 0 confirmed / 35 unknown
+22.2s  106 candidates   5/6 sources   place: 51 confirmed / 31 unknown
 ```
 
-## Or watch it happen
+## Then a plan, and everything else it found
 
-![The WeekendFun dashboard](weekendfun/docs/dashboard.jpg)
+![The plan and the catalogue](weekendfun/docs/plan.jpg)
 
-`npm run dashboard` puts the fan-out on one clock — a lane per browser, the
-striped head of each bar being the geolocation gate and the solid part the
-source actually reading. Underneath: the plan on a map, thumbs that feed the
-learner, and an rrweb replay of the browser session that found each venue.
+## Why it needs a cloud browser
 
-## Why it needs cloud browsers
-
-Google Maps, Groupon, Eventbrite and Yelp all answer *"what's on this weekend"* differently depending on **where the browser is**. You cannot `fetch()` your way to a local answer.
-
-So: one browser per source, all placed in your city, all at once. Six sources answer in the time the slowest one takes. `npm run geo-proof` asks *"live music"* from two cities simultaneously and diffs the answers:
+**You have to be standing there.** The web personalises on where your traffic comes from and what you've clicked before — and someone new to a town has the wrong IP history and no click history, so the internet keeps showing them their old life. `npm run geo-proof` asks *"live music"* from two cities simultaneously and diffs the answers:
 
 | Tampa browser | Seattle browser |
 |---|---|
@@ -62,10 +48,12 @@ So: one browser per source, all placed in your city, all at once. Six sources an
 
 **0% overlap** — from the same residential IP pool.
 
-Three things make it a planner rather than a scraper:
+**And you don't have to be there yet.** Put a city you're moving to in the box and the answers are that city's, not a guess made from here. Nothing without a browser you can place somewhere can do that.
 
-- **Corroboration.** Three independent sources finding the same venue means more than any one ranking it first — and it's the signal only a parallel fan-out can compute.
-- **A geolocation gate.** Nothing searches until the browser proves where it is, because a silently-failed override returns plausible results for the wrong city and poisons the store.
+Three more things make it a planner rather than a scraper:
+
+- **Corroboration.** Independent sources agreeing on a venue means more than any one ranking it first — and it's the signal only a parallel fan-out can compute.
+- **An admission gate.** Every candidate from every source is asked whether it's near this city, on these days, and a thing you'd actually go and do. "Unknown" is its own state and it gets counted, because 70% of listings publish no location at all and pretending otherwise is how bad results got in.
 - **It learns.** Rate a plan; the next one is different. Deterministic, inspectable, and it works with the LLM switched off.
 
 Full details, the measured dead ends, and six gotchas that each cost an afternoon: **[weekendfun/README.md](weekendfun/README.md)**.
