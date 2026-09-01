@@ -212,6 +212,27 @@ describe("MAPS_TYPE_PATTERN: digging the descriptor out of a result card", () =>
     assert.equal(typeOf("The MotorVuThe MotorVu 4.1Drive-in movie theater ·  · 1 Rd"), "Drive-in movie theater")
   })
 
+  test("a review count between the rating and the descriptor", () => {
+    // Maps renders the count inconsistently in the coordinate-search rail, so
+    // the SAME venue flips between "4.0Bowling alley" and
+    // "4.0(212)Bowling alley" run to run. Requiring the descriptor to follow
+    // the rating immediately lost it on 308 of 1,184 stored cards — 26% — and
+    // those all fell back to "other", which is how a bowling alley stopped
+    // being a bowling alley between two identical searches.
+    assert.equal(
+      typeOf("Idaho Botanical GardenIdaho Botanical Garden 4.6(3,351)Tourist attraction ·  · 2355 N O"),
+      "Tourist attraction",
+    )
+    assert.equal(
+      typeOf("Palm Coast LanesPalm Coast Lanes 4.0(212)Bowling alley ·  · 11 Old Kings Rd"),
+      "Bowling alley",
+    )
+    assert.equal(
+      typeOf("Zoo BoiseZoo Boise 4.2(7,050)Tourist attraction ·  · 355 Julia Davis Dr"),
+      "Tourist attraction",
+    )
+  })
+
   test("single-word descriptor", () => {
     assert.equal(typeOf("Varn ParkVarn Park 4.7Park ·  · 3665 N Oceanshore Blvd"), "Park")
   })

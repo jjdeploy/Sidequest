@@ -190,12 +190,20 @@ export function isJunkEvent(title: string, evidence = ""): boolean {
  * Card text runs together as:
  *   "<name><name> 4.6Tourist attraction ·  · 401 W Kennedy BlvdHome to..."
  *
- * The separator inside the descriptor has to allow hyphens. Without that,
- * "4.9Custom t-shirt store ·" matched nothing at all, the descriptor was
- * lost, and a t-shirt shop got categorised by the search term that found it.
- * Same for "Go-kart track", "Drive-in theater", "Bed-and-breakfast".
+ * Two things it has to tolerate, both learned the hard way:
+ *
+ *  - **A review count between the rating and the descriptor.** Maps renders
+ *    it inconsistently in this rail, so the same venue reads
+ *    "4.0Bowling alley" on one run and "4.0(212)Bowling alley" on the next.
+ *    Requiring the descriptor to follow the rating immediately lost it on
+ *    308 of 1,184 stored cards — 26% — and every one fell back to
+ *    "other". A bowling alley stopped being a bowling alley between two
+ *    identical searches.
+ *  - **Hyphens inside the descriptor.** "4.9Custom t-shirt store ·" matched
+ *    nothing, so a t-shirt shop got categorised by the search term that
+ *    found it. Same shape for "Go-kart track" and "Drive-in movie theater".
  */
-export const MAPS_TYPE_PATTERN = "\\d\\.\\d([A-Z][a-z]+(?:[\\s-][a-z]+)*)\\s*·"
+export const MAPS_TYPE_PATTERN = "\\d\\.\\d\\s*(?:\\([\\d,]+\\)\\s*)?([A-Z][a-z]+(?:[\\s-][a-z]+)*)\\s*·"
 
 export function categoryFromMapsType(raw: string): Category | null {
   const s = raw.toLowerCase().trim()
