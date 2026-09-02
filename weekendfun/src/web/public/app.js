@@ -182,7 +182,7 @@ const state = {
   t0: 0,
   lanes: new Map(),
   laneEls: new Map(),
-  blipEls: new Map(),
+  pipEls: new Map(),
   span: 20_000,
   recording: false,
   moods: new Set(),
@@ -331,13 +331,15 @@ function start() {
 
   state.running = true
   state.t0 = performance.now()
-  state.lanes.clear(); state.laneEls.clear(); state.blipEls.clear()
+  state.lanes.clear(); state.laneEls.clear(); state.pipEls.clear()
   state.span = 20_000
   state.catalogue = []; state.planned.clear(); state.expanded.clear(); state.filter = "all"
   state.gathered = null; state.screened = null
-  clear($("lanes")); clear($("terms")); clear($("blips"))
+  clear($("lanes")); clear($("terms")); clear($("pips"))
   $("foundCount").textContent = "0"
   $("foundLabel").textContent = "standing by"
+  $("ringFill").classList.add("ring--idle")
+  $("ringFill").style.strokeDashoffset = String(RING * 0.9)
   $("workingLine").textContent = "Getting a fix on the place…"
   $("writeupBlock").hidden = true
   $("formError").hidden = true
@@ -393,7 +395,7 @@ function onPlace(e) {
   $("statusPlace").textContent = e.place.label
   $("statusCoords").textContent = `${e.place.lat.toFixed(4)}, ${e.place.lng.toFixed(4)}`
   renderHere(e.place)
-  drawDial()
+  drawRing()
   // What the model made of the free text, shown before the results so a
   // misreading is visible while it still explains the plan.
   state.askNote = e.askNote
@@ -416,30 +418,21 @@ function onLaunching(e) {
   // "8 of 13 in position" beats a bare count: it says how far through it is.
   $("readyTotal").textContent = String(e.browsers ?? e.sources.length)
   const lanes = $("lanes")
-  const blips = $("blips")
+  const pips = $("pips")
   clear(lanes)
-  clear(blips)
-  state.blipEls.clear()
+  clear(pips)
+  state.pipEls.clear()
 
-  // Blips sit just outside the dial, evenly spaced, starting at the top.
-  // The label flips to whichever side keeps it off the face.
-  e.sources.forEach((id, i) => {
-    // Angle only. The radius is a CSS variable so the dial can shrink on a
-    // phone without JS having to know how wide the page is.
-    const deg = -90 + (i * 360) / e.sources.length
-    const up = Math.sin(deg * (Math.PI / 180)) < 0
-    const dot = el("span", { class: "blip-dot" })
-    const out = el("span", { class: "blip-out" }, "·")
-    const blip = el("div", {
-      class: `blip ${up ? "blip--up" : "blip--down"}`,
-      style: `--a:${deg}deg`,
-    }, [dot, el("span", { class: "blip-label" }, [
-      el("span", { class: "blip-name" }, SOURCE_NAME[id] ?? id),
+  for (const id of e.sources) {
+    const out = el("span", { class: "pip-out" }, "")
+    const pip = el("span", { class: "pip" }, [
+      el("span", { class: "pip-dot" }),
+      el("span", {}, SOURCE_NAME[id] ?? id),
       out,
-    ])])
-    blips.append(blip)
-    state.blipEls.set(id, { blip, out, up })
-  })
+    ])
+    pips.append(pip)
+    state.pipEls.set(id, { pip, out })
+  }
 
   for (const id of e.sources) {
     state.lanes.set(id, {
@@ -491,40 +484,58 @@ function onPool(at, ev) {
   }
   const gated = [...state.lanes.values()].reduce((n, l) => n + l.gated, 0)
   $("readyCount").textContent = String(gated)
-  drawDial()
+  drawRing()
   draw()
 }
 
+/** 2πr for the r=52 circle in the markup. */
+const RING = 326.7
+
 /**
- * The dial: what each source is doing, and the running total in the middle.
+ * The ring: how far through the fan-out is, and what it has found so far.
  *
- * Every line here is something that actually happened — a browser reaching
+ * Every number here is something that actually happened — a browser reaching
  * its coordinates, a source answering with a count — rather than a spinner
  * pretending time is passing. Waiting is easier when the wait is legible.
+ *
+ * A source is worth a third of its share once its browsers are in position
+ * and the rest when it answers, so the ring moves twice per source instead
+ * of sitting still and then jumping a sixth.
  */
-function drawDial() {
+function drawRing() {
   const lanes = [...state.lanes.values()]
   const found = lanes.reduce((n, l) => n + (l.found ?? 0), 0)
   const gated = lanes.reduce((n, l) => n + l.gated, 0)
   const settled = lanes.filter((l) => l.endAt !== null).length
 
   for (const lane of lanes) {
-    const dom = state.blipEls.get(lane.id)
+    const dom = state.pipEls.get(lane.id)
     if (!dom) continue
-    const landed =
+    dom.pip.className = `pip ${
       lane.found !== null ? "is-in"
       : lane.status === "failed" ? "is-out"
       : lane.gated > 0 ? "is-placed"
-      : ""
-    dom.blip.className = `blip ${dom.up ? "blip--up" : "blip--down"} ${landed}`
+      : ""}`
     dom.out.textContent =
-      lane.found !== null ? `${lane.found} found`
-      : lane.status === "failed" ? "no answer"
-      : lane.gated > 0 ? "in position"
-      : "·"
+      lane.found !== null ? String(lane.found)
+      : lane.status === "failed" ? "—"
+      : lane.gated > 0 ? "✓"
+      : ""
   }
 
-  $("foundCount").textContent = String(found)
+  const progress = lanes.length === 0 ? 0
+    : lanes.reduce((n, l) => n + (l.endAt !== null ? 1 : l.gated > 0 ? 0.34 : 0), 0) / lanes.length
+  const ring = $("ringFill")
+  ring.classList.toggle("ring--idle", progress === 0)
+  ring.style.strokeDashoffset = String(progress === 0 ? RING * 0.9 : RING * (1 - progress))
+
+  const counter = $("foundCount")
+  if (counter.textContent !== String(found)) {
+    counter.textContent = String(found)
+    counter.classList.remove("bump")
+    void counter.offsetWidth // restart the animation
+    counter.classList.add("bump")
+  }
   $("foundLabel").textContent = found === 1 ? "place found" : "places found"
 
   // `place` arrives before `launching`, so an empty lane set means the

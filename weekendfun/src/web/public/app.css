@@ -70,8 +70,12 @@ button { font: inherit; color: inherit; }
 /* One screen at a time. Layout rules below must never set `display`, or they
    beat this on equal specificity and every screen shows at once. */
 .screen { display: none; }
-body[data-screen="working"] .screen--working,
 body[data-screen="results"] .screen--results { display: block; }
+/* The wait is one small object on a big page, so it sits in the middle of
+   the viewport rather than pinned under the header with a screenful of
+   nothing below it. `display` belongs here, with the toggle, never in a
+   layout rule further down. */
+body[data-screen="working"] .screen--working { display: grid; place-items: center; }
 body[data-screen="landing"] .screen--landing { display: flex; }
 
 /* Shared micro-label. One rule, so every label in the product matches. */
@@ -334,112 +338,84 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 
 /* ═══════════════════════════════════════════════════════════════ working */
 
-.working-body { padding: var(--s7) var(--gutter) var(--s8); max-width: 1180px; margin: 0 auto; }
+.screen--working { min-height: calc(100dvh - var(--topbar)); }
+.working-body { padding: var(--s6) var(--gutter) var(--s7); max-width: 720px; width: 100%; }
 
 /* One line, labelled. This used to be three stacked lines with the place name
    set as a headline — which made the loading screen the loudest thing in the
    product, for information nobody asked for. */
 /* ── the wait ────────────────────────────────────────────────────────────
  *
- * A wall of progress bars and timings is the right picture for someone
- * debugging the fan-out and the wrong one for someone who just asked what to
- * do on Saturday. What is actually happening — a dozen browsers standing at
- * one set of coordinates, reporting back one at a time — is a radar picture,
- * so that is what you watch. The bars still exist and still get timed; they
- * move to the results page as the record.
+ * A wall of progress bars and per-source timings is the right picture for
+ * someone debugging the fan-out and the wrong one for someone who just asked
+ * what to do on Saturday. One ring, filling as the sources come back, with
+ * the running count of what they found in the middle. The bars still exist
+ * and still get timed; they move to the results page as the record.
  */
-.dial-wrap {
-  position: relative; width: min(430px, 100%); height: 400px;
-  margin: var(--s6) auto var(--s5);
-}
-.dial {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: 236px; height: 236px; border-radius: 50%;
+.ring-wrap {
+  position: relative; width: 208px; height: 208px;
+  margin: var(--s7) auto var(--s5);
   display: grid; place-items: center;
-  background: radial-gradient(circle at 50% 50%, #fff8f2, var(--sand));
-  box-shadow: inset 0 0 0 1px var(--rule-2), 0 18px 40px -22px rgba(120,70,35,.5);
 }
-.dial-ring { position: absolute; border-radius: 50%; border: 1px solid var(--rule); }
-.dial-ring--1 { inset: 26px; }
-.dial-ring--2 { inset: 58px; }
-.dial-ring--3 { inset: 90px; }
-.dial-cross {
-  position: absolute; inset: 8px;
-  background:
-    linear-gradient(to right, transparent calc(50% - .5px), var(--rule) calc(50% - .5px), var(--rule) calc(50% + .5px), transparent calc(50% + .5px)),
-    linear-gradient(to bottom, transparent calc(50% - .5px), var(--rule) calc(50% - .5px), var(--rule) calc(50% + .5px), transparent calc(50% + .5px));
+.ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring-track { fill: none; stroke: var(--sand); stroke-width: 9; }
+.ring-fill {
+  fill: none; stroke: url(#ringGrad); stroke-width: 9; stroke-linecap: round;
+  /* 2πr for r = 52. Fully offset is an empty ring. */
+  stroke-dasharray: 326.7;
+  stroke-dashoffset: 326.7;
+  transition: stroke-dashoffset .5s cubic-bezier(.3, .9, .3, 1);
 }
+/* Nothing to report yet — geocoding, or the browsers aren't up. A short arc
+   going round says "still working" without inventing a percentage. */
+.ring-fill.ring--idle {
+  transition: none;
+  transform-origin: 60px 60px;
+  animation: ring-spin 1.5s cubic-bezier(.5, .1, .5, .9) infinite;
+}
+@keyframes ring-spin { to { transform: rotate(360deg); } }
 
-/* The sweep. One beam, trailing off behind itself, the way a radar reads. */
-/* Masked rather than clipped with overflow. A rotating element gets its own
-   compositing layer, and the rounded clip was being applied to the layer
-   before the rotation rather than after — so the beam painted a square
-   corner outside the dial. A mask travels with the element. */
-.dial-sweep {
-  position: absolute; inset: 0; border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    rgba(244, 85, 44, .40) 0deg,
-    rgba(244, 85, 44, .16) 26deg,
-    rgba(244, 85, 44, .04) 70deg,
-    transparent 130deg,
-    transparent 360deg);
-  -webkit-mask: radial-gradient(circle at 50% 50%, #000 99.5%, transparent 100%);
-  mask: radial-gradient(circle at 50% 50%, #000 99.5%, transparent 100%);
-  animation: radar-sweep 2.8s linear infinite;
-  will-change: transform;
-}
-/* Named for what it is, not for what it does. `sweep` was already taken by
-   the lane shimmer further down, and the later definition wins document-wide
-   — so the beam was running the shimmer's translateX and sliding out of the
-   dial sideways. */
-@keyframes radar-sweep { to { transform: rotate(360deg); } }
-
-.dial-core { position: relative; display: grid; justify-items: center; gap: 2px; }
-.dial-core b {
-  font-family: var(--display); font-weight: 800; font-size: 46px;
+.ring-core { position: relative; display: grid; justify-items: center; gap: 3px; }
+.ring-core b {
+  font-family: var(--display); font-weight: 800; font-size: 52px;
   letter-spacing: -0.05em; line-height: 1; font-variant-numeric: tabular-nums;
 }
-.dial-core em {
+/* A small nudge each time the number goes up, so the count feels like it is
+   arriving rather than ticking. */
+.ring-core b.bump { animation: bump .35s cubic-bezier(.2, 1.5, .4, 1); }
+@keyframes bump { 0% { transform: scale(1); } 45% { transform: scale(1.12); } }
+.ring-core em {
   font: 500 10px var(--mono); font-style: normal;
   letter-spacing: .14em; text-transform: uppercase; color: var(--faint);
 }
 
-/* The blips. Placed on the outer ring by angle, labels flipped to the
-   outside so no label ever lands on the dial. */
-/* Blips are placed with a pixel offset from the centre, not a percentage —
-   the wrap isn't square, so percentages put them on an ellipse. */
-.blips { position: absolute; inset: 0; --r: 152px; }
-.blip {
-  position: absolute; left: 50%; top: 50%;
-  /* Out along the angle, then un-rotated so the label stays upright. */
-  transform: rotate(var(--a)) translateX(var(--r)) rotate(calc(-1 * var(--a)));
+/* One pip per source, in the order they were launched. */
+.pips {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: var(--s2); margin-bottom: var(--s4);
 }
-.blip-dot {
-  position: absolute; left: -6px; top: -6px; width: 12px; height: 12px;
-  border-radius: 50%; background: var(--rule-2);
-  transition: background .25s, box-shadow .25s, transform .25s;
+.pip {
+  display: inline-flex; align-items: center; gap: var(--s2);
+  padding: 5px 13px 5px 10px; border-radius: var(--r-pill);
+  background: var(--card); border: 1px solid var(--rule);
+  font: 400 12px var(--mono); color: var(--faint);
+  transition: border-color .25s, color .25s, background .25s;
 }
-.blip-label {
-  position: absolute; left: -58px; width: 116px; text-align: center;
-  display: grid; gap: 1px;
+.pip-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex: none;
+  background: var(--rule-2); transition: background .25s, box-shadow .25s;
 }
-.blip--down .blip-label { top: 13px; }
-.blip--up .blip-label { bottom: 13px; }
-.blip-name { font: 500 11.5px var(--mono); color: var(--faint); transition: color .25s; }
-.blip-out { font: 400 10.5px var(--mono); color: transparent; font-variant-numeric: tabular-nums; }
+.pip-out { color: inherit; opacity: .75; }
 
-.blip.is-placed .blip-dot { background: var(--sea); box-shadow: 0 0 0 4px rgba(13,148,136,.16); }
-.blip.is-placed .blip-name { color: var(--muted); }
-.blip.is-placed .blip-out { color: var(--sea); }
+.pip.is-placed { color: var(--muted); }
+.pip.is-placed .pip-dot { background: var(--sea); box-shadow: 0 0 0 3px rgba(13,148,136,.16); }
 
-.blip.is-in .blip-dot { background: var(--coral); box-shadow: 0 0 0 5px rgba(244,85,44,.18); animation: land .45s cubic-bezier(.2,1.4,.4,1); }
-.blip.is-in .blip-name { color: var(--ink); }
-.blip.is-in .blip-out { color: var(--ink); }
-@keyframes land { 0% { transform: scale(.4); } 60% { transform: scale(1.5); } }
+.pip.is-in { color: var(--ink); border-color: #ffcbbc; background: #fff6f3; }
+.pip.is-in .pip-dot { background: var(--coral); animation: land .4s cubic-bezier(.2,1.4,.4,1); }
+@keyframes land { 0% { transform: scale(.3); } 60% { transform: scale(1.5); } }
 
-.blip.is-out .blip-dot { background: var(--card); box-shadow: inset 0 0 0 2px #f0c4bb; }
-.blip.is-out .blip-out { color: var(--faint); }
+.pip.is-out { color: var(--faint); }
+.pip.is-out .pip-dot { background: var(--card); box-shadow: inset 0 0 0 2px #f0c4bb; }
 
 .working-line {
   text-align: center; margin: 0 auto var(--s2); max-width: 46ch;
@@ -775,15 +751,9 @@ body[data-screen="landing"] .screen--landing { display: flex; }
   .stop-body { grid-column: 2; padding: 0 0 var(--s4) var(--s4); }
   .day-head { padding: var(--s4); }
 
-  .dial-wrap { margin: var(--s5) auto var(--s4); }
-  .dial-wrap { height: 300px; }
-  .dial { width: 152px; height: 152px; }
-  .dial-ring--1 { inset: 17px; } .dial-ring--2 { inset: 38px; } .dial-ring--3 { inset: 58px; }
-  .dial-core b { font-size: 32px; }
-  .blips { --r: 112px; }
-  .blip-label { left: -44px; width: 88px; }
-  .blip-name { font-size: 10px; }
-  .blip-out { font-size: 9.5px; }
+  .ring-wrap { width: 168px; height: 168px; margin-top: var(--s6); }
+  .ring-core b { font-size: 42px; }
+  .pip { font-size: 11px; padding: 4px 10px 4px 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

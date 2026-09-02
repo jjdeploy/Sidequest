@@ -157,22 +157,22 @@
 <!-- ══════════════════════════════════════════════════════════════ working -->
 <section class="screen screen--working" id="working">
   <div class="working-body">
-    <!-- A dozen browsers reporting in from one set of coordinates is a radar
-         picture, so that is what the wait looks like. Each source is a blip
-         that lands when it answers; the middle counts what has come back. -->
-    <div class="dial-wrap">
-      <div class="dial" aria-hidden="true">
-        <span class="dial-ring dial-ring--1"></span>
-        <span class="dial-ring dial-ring--2"></span>
-        <span class="dial-ring dial-ring--3"></span>
-        <span class="dial-cross"></span>
-        <span class="dial-sweep"></span>
-        <span class="dial-core">
-          <b id="foundCount">0</b>
-          <em id="foundLabel">standing by</em>
-        </span>
+    <!-- One ring that fills as the sources come back, and the running count
+         of what they found in the middle. -->
+    <div class="ring-wrap">
+      <svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+        <defs>
+          <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ff9f1c"/><stop offset="1" stop-color="#f4552c"/>
+          </linearGradient>
+        </defs>
+        <circle class="ring-track" cx="60" cy="60" r="52"/>
+        <circle class="ring-fill" id="ringFill" cx="60" cy="60" r="52"/>
+      </svg>
+      <div class="ring-core">
+        <b id="foundCount">0</b>
+        <em id="foundLabel">standing by</em>
       </div>
-      <div class="blips" id="blips"></div>
     </div>
 
     <p class="working-line" id="workingLine" role="status">Getting a fix on the place…</p>
@@ -182,6 +182,7 @@
       <span class="status-ready"><b id="readyCount">0</b>/<span id="readyTotal">–</span> in position</span>
     </p>
 
+    <div class="pips" id="pips"></div>
     <div class="terms" id="terms"></div>
     <p class="hint">Nothing searches until the page it opened confirms where it is.</p>
 
