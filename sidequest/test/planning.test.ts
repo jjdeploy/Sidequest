@@ -650,6 +650,29 @@ describe("what you typed is a requirement, not a preference", () => {
     assert.equal(it.days[0]!.items.find((i) => i.slot === "Evening")?.scored.candidate.id, "lanes")
   })
 
+  test("Palm Coast Lanes is bowling, and does not say so", () => {
+    // The venue almost never repeats the search term. An alley is called
+    // Lanes, an arcade is called a Retrocade, a music venue is called a
+    // Hall. Matching the literal word finds Sky Lanes Bowling by luck and
+    // misses every other alley in the country.
+    const pinball = scored(candidate({ id: "pin", title: "Asheville Pinball Museum", category: "active" }), 30)
+    const lanes = scored(candidate({ id: "lanes", title: "Palm Coast Lanes", category: "active" }), 3)
+    const it = buildItinerary([pinball, lanes], request({ days: [WEEKEND[0]!] }), [], new Set(), "evening",
+      [{ term: "bowling", category: "active" }])
+    assert.equal(it.days[0]!.items.find((i) => i.slot === "Evening")?.scored.candidate.id, "lanes")
+  })
+
+  test("...but only where the category agrees", () => {
+    // "Lanes" is a loose signal — Penny Lane Antiques, Memory Lane Diner.
+    // Safe because it only decides anything when the listing is filed under
+    // the category the request was for.
+    const antiques = scored(candidate({ id: "ant", title: "Memory Lane Antiques", category: "shopping" }), 40)
+    const pinball = scored(candidate({ id: "pin", title: "Asheville Pinball Museum", category: "active" }), 3)
+    const it = buildItinerary([antiques, pinball], request({ days: [WEEKEND[0]!] }), [], new Set(), "evening",
+      [{ term: "bowling", category: "active" }])
+    assert.equal(it.days[0]!.items.find((i) => i.slot === "Evening")?.scored.candidate.id, "pin")
+  })
+
   test("a blurb that mentions bowling is not a bowling alley", () => {
     // Biltmore Estate was booked as the Sunday evening bowling. The house
     // has a two-lane alley in the basement, so the word is in the listing —
@@ -697,6 +720,18 @@ describe("what you typed is a requirement, not a preference", () => {
     assert.equal(it.unmet.length, 2, JSON.stringify(it.unmet))
     assert.match(it.unmet.join(" "), /bowling/)
     assert.match(it.unmet.join(" "), /club/i)
+  })
+
+  test("with no hour named, it books the slot that suits it", () => {
+    // "live music" with no time on it should not become Saturday at ten
+    // merely because that slot came first in the list.
+    const band = scored(candidate({ id: "band", title: "The Grey Eagle", category: "music" }), 5)
+    const filler = Array.from({ length: 10 }, (_, i) =>
+      scored(candidate({ id: `f-${i}`, category: i % 2 ? "outdoors" : "culture" }), 30 - i))
+    const it = buildItinerary([...filler, band], request(), [], new Set(), undefined,
+      [{ term: "live music venues", category: "music" }])
+    const at = it.days.flatMap((d) => d.items).find((i) => i.scored.candidate.id === "band")
+    assert.equal(at?.slot, "Evening")
   })
 
   test("more requests than nights is also news", () => {

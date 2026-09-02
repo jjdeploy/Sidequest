@@ -80,6 +80,63 @@ const VIBE_TERMS: Record<string, Array<[string, Category]>> = {
 }
 
 /**
+ * What a venue of this kind is actually called.
+ *
+ * A search term and a venue name are different registers. Almost no bowling
+ * alley has "bowling" in its name — Palm Coast Lanes, Sky Lanes, Star Bowl,
+ * AMF. An arcade is a Retrocade, a music venue is a Hall, a cinema is a
+ * Cinema. Matching the literal word finds one alley by luck and misses the
+ * rest of the country.
+ *
+ * Hand-written, and that is fine here: the left-hand column is not open
+ * text. Every term this is ever asked about comes from the closed vocabulary
+ * in this file, so the table has a finite job and a visible edge.
+ *
+ * The patterns are deliberately loose — "lanes" is in Memory Lane Antiques,
+ * "hall" is in City Hall — because engine/itinerary.ts only lets an alias
+ * decide anything when the listing is ALSO filed under the category the
+ * request was for. A loose name and the right category is a bowling alley;
+ * a loose name on its own is a coincidence.
+ */
+const ALSO_CALLED: Record<string, RegExp> = {
+  bowling: /\b(?:lanes?|alley|bowl\w*|strike)\b/i,
+  arcades: /\b(?:arcade|barcade|retrocade|pinball|amusements?)\b/i,
+  "dance clubs": /\b(?:clubs?|disco\w*|dance\w*|dj|nightlife)\b/i,
+  "cocktail bars": /\b(?:bars?|lounges?|taverns?|cocktails?|speakeas\w*)\b/i,
+  "wine bars": /\b(?:wine|vino|cellars?|winer\w*)\b/i,
+  "sports bars": /\b(?:sports?|bars?|taverns?|pubs?)\b/i,
+  "rooftop bars": /\b(?:rooftop|terrace|sky ?bar|top of)\b/i,
+  breweries: /\b(?:brewer\w*|brewing|brewpubs?|taprooms?|ale\w*|beer)\b/i,
+  "live music venues": /\b(?:music|amphitheat\w*|halls?|stage|venue|listening room|opry)\b/i,
+  "movie theater": /\b(?:cinemas?|theat\w*|drive-?in|imax)\b/i,
+  "mini golf": /\b(?:golf|putt\w*|links)\b/i,
+  "climbing gym": /\b(?:climb\w*|boulder\w*|crag)\b/i,
+  kayaking: /\b(?:kayak\w*|paddle\w*|canoe|tubing|outfitters?)\b/i,
+  "bike trails": /\b(?:bikes?|cycl\w*|greenway|trail)\b/i,
+  "hiking trails": /\b(?:trails?|greenway|preserve|forest|falls|summit|ridge|gorge|overlook)\b/i,
+  parks: /\b(?:parks?|gardens?|greenway|commons?|square|riverwalk)\b/i,
+  museums: /\b(?:museums?|galler\w*|collection|historic\w*|heritage)\b/i,
+  "art galleries": /\b(?:galler\w*|arts?|studios?|glassworks|pottery|makers?)\b/i,
+  "coffee shops": /\b(?:coffee|espresso|roaster\w*|cafes?|café)\b/i,
+  bookstores: /\b(?:books?|bookshop|bookstore|libr\w*)\b/i,
+  "farmers market": /\b(?:markets?|farmers?|grower\w*)\b/i,
+  restaurants: /\b(?:restaurants?|kitchens?|grille?|bistro|diner|eatery)\b/i,
+}
+
+/**
+ * Does this venue name answer that search term?
+ *
+ * The NAME, never the description. Reading the whole listing booked Biltmore
+ * Estate as an evening of bowling — the house has a two-lane alley in the
+ * basement, so the word really is in the blurb. What a listing is called is a
+ * claim about what it is; what its description mentions in passing is not.
+ */
+export function answersTo(term: string, title: string): boolean {
+  if (mentions(term, title)) return true
+  return ALSO_CALLED[term.toLowerCase()]?.test(title) ?? false
+}
+
+/**
  * The floor: one strong Maps term per category the itinerary needs to fill.
  *
  * This is the "I'm new here and bored" query set, and it exists because the

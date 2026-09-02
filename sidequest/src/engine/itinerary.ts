@@ -20,7 +20,7 @@ import { explain } from "./score.js"
 import { milesBetween } from "../sources/util.js"
 import { eventDateOf, eventPartOfDay } from "../sources/when.js"
 import { isWashout } from "../sources/weather.js"
-import { mentions } from "./keywords.js"
+import { answersTo } from "./keywords.js"
 
 /** Slots are wall-clock shapes, not exact times — the sources rarely give us
  *  real opening hours, and inventing "10:04am" would be false precision. */
@@ -225,16 +225,19 @@ export function buildItinerary(
   const key = (date: string, slot: string) => `${date}|${slot}`
 
   if (required.length > 0) {
-    // The slots that can honour the request, in the order they happen.
+    // The slots that can honour the request. When they named an hour it is
+    // that hour on each day; when they did not, the whole weekend is open
+    // and the booking goes wherever it suits — "live music" with no time on
+    // it should not become Saturday at ten merely because that slot is
+    // first in the list.
     const openings = dayOrder.flatMap((date) =>
       SLOTS.filter((slot) => !timeOfDay || timeOfDay.toLowerCase() === slot.label.toLowerCase())
         .map((slot) => ({ date, slot })))
+    const taken = new Set<string>()
     const when = timeOfDay ? ` in the ${timeOfDay}` : ""
-    let next = 0
 
     for (const want of required) {
-      const spot = openings[next]
-      if (!spot) {
+      if (taken.size >= openings.length) {
         unmet.push(
           `You asked for ${want.term}${when} — the weekend ran out of ` +
             `${timeOfDay ?? "slot"}s before it got there.`,
@@ -242,26 +245,43 @@ export function buildItinerary(
         continue
       }
 
-      // The name first, the category second. "bowling" and a pinball museum
-      // are both `active`, and only one of them is bowling — a reservation
-      // made for a word should be spent on something that answers it.
-      //
-      // The NAME, and not the evidence. Reading the whole listing booked
-      // Biltmore Estate as the Sunday evening bowling: the house has a
-      // two-lane alley in the basement, so the word is genuinely in the
-      // blurb. It is the same rule engine/age.ts runs on and for the same
-      // reason — what a listing is called is a claim about what it is, and
-      // what its description mentions in passing is not.
-      let best: { s: Scored; rank: number } | null = null
-      for (const s of ranked) {
-        if (used.has(s.candidate.id)) continue
-        const c = s.candidate
-        if (!fitsSlot(c, spot.date, spot.slot)) continue
-        if (costOf(s) > remainingBudget) continue
-        const byName = mentions(want.term, c.title)
-        if (!byName && c.category !== want.category) continue
-        const rank = (byName ? 1000 : 0) + s.score
-        if (!best || rank > best.rank) best = { s, rank }
+      /**
+       * Rank a candidate against what was asked for.
+       *
+       * Three tiers, and the middle one is what makes the loose half of the
+       * vocabulary safe:
+       *
+       *   the right kind of place AND a name that answers the term
+       *   the right kind of place
+       *   a name that answers the term, and nothing else to go on
+       *
+       * "Lanes" is in Memory Lane Antiques and "hall" is in City Hall, so an
+       * alias on its own proves very little. An alias plus the category the
+       * request was for is Palm Coast Lanes. The bottom tier still exists
+       * because a bowling alley Maps forgot to type comes back as `other`,
+       * and it is still the bowling alley.
+       */
+      const tierOf = (s: Scored) => {
+        const byName = answersTo(want.term, s.candidate.title)
+        const byKind = s.candidate.category === want.category
+        return byName && byKind ? 2000 : byKind ? 1000 : byName ? 1 : 0
+      }
+
+      let best: { s: Scored; spot: (typeof openings)[number]; rank: number } | null = null
+      for (const spot of openings) {
+        if (taken.has(key(spot.date, spot.slot.label))) continue
+        for (const s of ranked) {
+          if (used.has(s.candidate.id)) continue
+          const tier = tierOf(s)
+          if (tier === 0) continue
+          if (!fitsSlot(s.candidate, spot.date, spot.slot)) continue
+          if (costOf(s) > remainingBudget) continue
+          // Slot suitability breaks the tie between two openings, which is
+          // the whole reason this loops over spots rather than taking the
+          // first one.
+          const rank = tier + s.score + (spot.slot.prefer.includes(s.candidate.category) ? 12 : -10)
+          if (!best || rank > best.rank) best = { s, spot, rank }
+        }
       }
 
       if (!best) {
@@ -269,11 +289,12 @@ export function buildItinerary(
         continue
       }
 
-      booked.set(key(spot.date, spot.slot.label), best.s)
+      const k = key(best.spot.date, best.spot.slot.label)
+      booked.set(k, best.s)
+      taken.add(k)
       used.add(best.s.candidate.id)
       remainingBudget -= costOf(best.s)
       owed.delete(best.s.candidate.category)
-      next++
     }
   }
 
