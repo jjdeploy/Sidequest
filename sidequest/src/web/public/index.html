@@ -93,8 +93,21 @@
               <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" fill="none" stroke="currentColor" stroke-width="1.7"/>
               <circle cx="12" cy="10" r="2.5" fill="currentColor"/>
             </svg>
-            <input id="city" name="city" list="cityList" placeholder="Tampa, FL" required
-                   autocapitalize="words" spellcheck="false">
+            <!-- No `name`, deliberately.
+
+                 Browser form history is keyed on the field name, so a named
+                 input gets a dropdown of every city anyone has typed here —
+                 over the top of the datalist below, which is the list we
+                 actually curated. Chrome also reads `name="city"` as an
+                 address field and offers saved addresses, and it ignores
+                 autocomplete="off" when it does. Nothing needs the name:
+                 the form never submits natively, app.js builds the query.
+
+                 The data-* attributes are what 1Password and LastPass look
+                 for; without them they inject their own icon into the bar. -->
+            <input id="city" list="cityList" placeholder="Tampa, FL" required
+                   autocomplete="off" autocapitalize="words" spellcheck="false"
+                   data-1p-ignore data-lpignore="true" data-form-type="other">
             <datalist id="cityList">
               <option value="Tampa, FL"><option value="Palm Coast, FL"><option value="Austin, TX">
               <option value="Seattle, WA"><option value="Asheville, NC"><option value="Boise, ID">
@@ -124,7 +137,8 @@
           </button>
         </div>
 
-        <input id="ask" name="ask" class="ask-line"
+        <input id="ask" class="ask-line"
+               autocomplete="off" data-1p-ignore data-lpignore="true" data-form-type="other"
                placeholder="or say what you're after — bowling at night, under $80">
 
         <div class="popular">
