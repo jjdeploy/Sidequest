@@ -12,3 +12,6 @@ data/
 
 # Shader previews, rendered on demand by the headless renderer.
 sidequest/docs/preview-*.png
+
+# Agent tooling, installed with `npx skills add`. Not part of the project.
+.agents/
