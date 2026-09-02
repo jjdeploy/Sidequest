@@ -36,7 +36,7 @@
  */
 import type { Candidate, Place, PlanRequest } from "../types.js"
 import { milesBetween } from "../sources/util.js"
-import { isJunkEvent } from "../sources/util.js"
+import { isErrandKind, isJunkEvent } from "../sources/util.js"
 import { isDegenerate } from "../sources/text.js"
 import { eventDateOf, prettyDate } from "../sources/when.js"
 import { isAdultOnly, partyIsOver21 } from "./age.js"
@@ -208,6 +208,17 @@ function checkKind(c: Candidate): Finding {
   if (isJunkEvent(c.title, c.evidence)) {
     return { dimension: "kind", state: "fail", fatal: true, points: -60,
       why: "reads as business, admin or virtual programming rather than a weekend out" }
+  }
+
+  // The source said what it is, and what it is is an errand.
+  //
+  // "Big Frog Custom T-Shirts & More" took a Saturday morning in Palm Coast
+  // and "Slingin' Wood Pro Shop" — a bowling SUPPLY retailer — took an
+  // Asheville afternoon, both because a search found them and nothing ever
+  // asked what they were. Maps had written it on the card.
+  if (isErrandKind(c.kind)) {
+    return { dimension: "kind", state: "fail", fatal: true, points: -60,
+      why: `the listing calls itself a ${c.kind!.toLowerCase()} — somewhere you go when something needs doing` }
   }
   return { dimension: "kind", state: "ok", fatal: false, points: 0, why: "a real thing to go and do" }
 }

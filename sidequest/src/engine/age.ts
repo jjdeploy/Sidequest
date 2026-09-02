@@ -59,6 +59,18 @@ const AGE_GATE =
   /(?<![$£€.\d])\b(?:18|19|20|21)\s*\+|\b(?:18|19|20|21)\s*(?:and|&)\s*(?:over|up|older)\b|\bmust be 21\b|\b21 to enter\b|\badults?[ -]only\b|\bno minors\b/i
 
 /**
+ * The same question asked of a source's own type descriptor.
+ *
+ * A much smaller vocabulary than the one below, because Maps controls it and
+ * uses about a dozen words for drink. Worth having separately rather than
+ * reusing the name patterns: "Bar" as a whole descriptor is decisive, where
+ * "bar" inside a name is the most ambiguous token in the file.
+ */
+const ADULT_KIND = /^(?:.*\s)?(?:bar|pub|nightclub|night club|club|lounge|casino|cigar|hookah)(?:\s.*)?$/i
+const ALL_AGES_KIND =
+  /brewer|brewing|taproom|brewpub|winer|vineyard|cider|meader|distiller|restaurant|caf|coffee|steak|seafood|pizz|diner|bakery|deli|grill|eatery|barbecue|sushi|ramen|noodle|burger|taco|ice cream|dessert|food|store|shop|market|museum|galler|park|garden|hotel|resort|theat|cinema|bowling|arcade|zoo|aquarium/i
+
+/**
  * Rooms that turn a twenty-year-old away at the door. The NAME only.
  *
  * The test is not "does drink get sold here" — nearly everywhere sells
@@ -139,13 +151,26 @@ const DRINK_EVENT =
  * the same question about a search term it is considering, before any
  * browser has launched and before a Candidate exists.
  */
-export function isAdultOnly(x: { title: string; evidence?: string; category?: Category }): boolean {
+export function isAdultOnly(
+  x: { title: string; evidence?: string; category?: Category; kind?: string },
+): boolean {
   // The listing answered it itself.
   if (AGE_GATE.test(`${x.title} ${x.evidence ?? ""}`)) return true
 
   // ...and if it didn't, a book club is a book club whatever the category
   // guesser filed it under.
   if (INNOCUOUS_CLUB.test(x.title)) return false
+
+  // The source's own descriptor, where there is one.
+  //
+  // Everything below this line is a substitute for exactly this fact, and a
+  // worse one. Maps writing "Bar" on the card settles a question that "EBBE"
+  // and "Cork & Pint" and "The Odd" leave wide open, and it settles it the
+  // other way for "Bar Harbor Brewing".
+  if (x.kind) {
+    if (ADULT_KIND.test(x.kind)) return true
+    if (ALL_AGES_KIND.test(x.kind)) return false
+  }
 
   const name = x.title
 

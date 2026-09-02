@@ -170,6 +170,54 @@ describe("the summary is what makes the gaps visible", () => {
   })
 })
 
+describe("kind: an errand is not an outing", () => {
+  // Two of these reached real plans. "Big Frog Custom T-Shirts & More" took
+  // a Saturday morning in Palm Coast; "Slingin' Wood Pro Shop" — a bowling
+  // SUPPLY retailer — took an afternoon in Asheville when the search for
+  // bowling found it. Maps labelled both correctly on the card.
+  const judgeKind = async (c) => {
+    const cand = candidate(c)
+    const { verdicts } = await screen([cand], ctx)
+    return verdicts.get(cand.id)!.findings.find((f) => f.dimension === "kind")!
+  }
+
+  for (const kind of ["Custom t-shirt store", "Sporting goods store", "Auto repair shop", "Insurance agency", "Warehouse store", "Pharmacy"]) {
+    test(`${kind} is not a weekend`, async () => {
+      const v = await judgeKind({ title: "Somewhere", kind })
+      assert.equal(v.state, "fail", kind)
+      assert.equal(v.fatal, true)
+    })
+  }
+
+  // Verbatim from one Palm Coast run: Maps published a descriptor on 44 of
+  // the 48 candidates that survived to ranking. Two of these had been in a
+  // real plan — "We Sell Restaurants", a business brokerage, took a Sunday
+  // morning, and a bowling supply shop was found by the search for bowling.
+  for (const kind of [
+    "Variety store", "Janitorial service", "Window tinting service",
+    "Business broker", "Internet service provider", "Bowling supply shop",
+    "Banquet hall", "Cell phone store", "Employment agency",
+  ]) {
+    test(`${kind} is not a weekend either`, async () => {
+      const v = await judgeKind({ title: "Somewhere", kind })
+      assert.equal(v.state, "fail", kind)
+    })
+  }
+
+  // ...and the ones from the same run that must survive it.
+  for (const kind of [
+    "Bookstore", "Antique store", "Shopping mall", "Farmers market", "Gift shop",
+    "Art gallery", "Performing arts theater", "Movie theater", "Bowling alley",
+    "Brewery", "Museum", "Visitor center", "Community center", "Historical society",
+    "Breakfast restaurant", "Barbecue restaurant", "Pizza restaurant",
+  ]) {
+    test(`${kind} still is`, async () => {
+      const v = await judgeKind({ title: "Somewhere", kind })
+      assert.equal(v.state, "ok", kind)
+    })
+  }
+})
+
 describe("age: the 21+ flag is a gate, not a preference", () => {
   const adultCtx = { place: TAMPA, req: request({ party: { adults: 2, kids: 0, over21: true } }) }
 

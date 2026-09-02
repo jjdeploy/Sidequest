@@ -662,6 +662,15 @@ describe("what you typed is a requirement, not a preference", () => {
     assert.equal(it.days[0]!.items.find((i) => i.slot === "Evening")?.scored.candidate.id, "lanes")
   })
 
+  test("the card says Bowling alley, which settles it outright", () => {
+    // No alias needed and no category guess needed: Maps labelled it.
+    const opaque = scored(candidate({ id: "amf", title: "AMF Beacon", kind: "Bowling alley", category: "other" }), 3)
+    const pinball = scored(candidate({ id: "pin", title: "Asheville Pinball Museum", category: "active" }), 30)
+    const it = buildItinerary([pinball, opaque], request({ days: [WEEKEND[0]!] }), [], new Set(), "evening",
+      [{ term: "bowling", category: "active" }])
+    assert.equal(it.days[0]!.items.find((i) => i.slot === "Evening")?.scored.candidate.id, "amf")
+  })
+
   test("...but only where the category agrees", () => {
     // "Lanes" is a loose signal — Penny Lane Antiques, Memory Lane Diner.
     // Safe because it only decides anything when the listing is filed under

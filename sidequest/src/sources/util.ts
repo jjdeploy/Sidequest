@@ -133,6 +133,65 @@ export function guessCategory(text: string, fallback: Category = "other"): Categ
 }
 
 /**
+ * Type descriptors that name an errand rather than an outing.
+ *
+ * Matched against the source's OWN descriptor, never against a name, which
+ * is what makes a list this short defensible: Maps controls the left-hand
+ * vocabulary and it is small and stable. Guessing the same thing from names
+ * would be a treadmill.
+ *
+ * Two of these reached real plans. "Big Frog Custom T-Shirts & More" took a
+ * Saturday morning in Palm Coast, and "Slingin' Wood Pro Shop" — a bowling
+ * SUPPLY retailer — took an Asheville afternoon because the search for
+ * bowling found it. Maps had labelled both correctly on the card and nobody
+ * read the label.
+ *
+ * Deliberately not a list of every shop. Browsing IS a weekend: bookshops,
+ * antique stores, galleries, markets and malls all stay. The line is whether
+ * you would go there on a Saturday for its own sake, or only because
+ * something needed doing.
+ */
+const ERRAND_KIND = new RegExp(
+  [
+    // Retail you visit because something ran out.
+    "variety store|discount store|dollar store|convenience store|grocery|supermarket",
+    "warehouse (?:store|club)|wholesale|department store|cell phone|electronics store",
+    "pharmacy|drug store|liquor store|vape|tobacco (?:shop|store)",
+    // Retail attached to a hobby rather than the hobby itself. A bowling
+    // SUPPLY shop is what the search for bowling actually found first.
+    "suppl(?:y|ies)|pro shop|sporting goods|hardware|home improvement|building materials|lumber|auto parts",
+    "custom t-?shirt|print shop|copy shop|sign shop|embroidery|screen printing",
+    // Anything whose descriptor is the word for a trade.
+    "janitorial|cleaning|tinting|towing|plumb|electrician|hvac|roofing|landscap|pest control",
+    "repair|body shop|oil change|car wash|gas station|auto|tire|mechanic|dealer",
+    "moving (?:company|service)|storage|laundromat|dry clean|staffing|employment|recruit",
+    "service provider|internet service|utility|telecom",
+    // Somewhere a business happens.
+    "broker|brokerage|insurance|real estate|mortgage|bank|credit union|tax|accountant",
+    "law(?:yer)? office|attorney|notary|corporate office|coworking|office (?:building|space)",
+    "marketing|advertising|consultan|agency",
+    // Rented rather than visited.
+    "banquet hall|conference cent(?:er|re)|social club|country club|private club",
+    // Errands with a waiting room.
+    "medical|dental|dentist|doctor|clinic|urgent care|hospital|veterinar|optometr|chiropract",
+    "barber|nail salon|hair salon|tanning|spa treatment|physical therapy",
+    "school|college|university|day ?care|church|funeral|cemetery|post office|dmv|city hall",
+  ].join("|"),
+  "i",
+)
+
+/**
+ * Does the source's own descriptor say this is an errand?
+ *
+ * Returns false when there is no descriptor, which is most event listings
+ * and about a quarter of Maps cards — silence is not evidence, and the
+ * heuristics elsewhere still get their say.
+ */
+export function isErrandKind(kind: string | undefined): boolean {
+  return kind !== undefined && ERRAND_KIND.test(kind)
+}
+
+/**
  * Is this "event" actually something you'd do on a weekend?
  *
  * Eventbrite and AllEvents are full of free listings that are really business
@@ -264,6 +323,8 @@ export interface BuildArgs {
   address?: string
   lat?: number
   lng?: number
+  /** The source's own type descriptor, verbatim. See Candidate.kind. */
+  kind?: string
   windows?: Candidate["windows"]
   indoor?: boolean | null
   image?: string
@@ -289,6 +350,7 @@ export function buildCandidate(a: BuildArgs): Candidate {
     address: cleanField(a.address)?.slice(0, 160),
     lat: a.lat,
     lng: a.lng,
+    kind: a.kind?.trim() || undefined,
     windows: a.windows ?? null,
     indoor: a.indoor ?? null,
     image: a.image,

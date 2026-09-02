@@ -2,15 +2,45 @@
 
 **You're bored. This town isn't.**
 
-What's on near you is split across a dozen sites and not one of them will sell
-you an API. Every attempt to unify local listings has died on exactly that —
-you'd have to convince every platform to cooperate.
+> A weekend planner that runs thirteen geo-verified cloud browsers in
+> parallel, reads a dozen local listing sites at once, and assembles a
+> Saturday and Sunday you can actually follow. Built on
+> [Solari](https://getsolari.com).
 
-So this doesn't ask. It opens real browsers in the cloud, stands them at your
-coordinates, and reads all of them at the same time. A browser is a
-permissionless interface: if a site has a page, it can be read.
+## The problem
 
-Built on [Solari](https://getsolari.com).
+You have just moved, or you are visiting, and it is Friday. What's on this
+weekend is scattered across a dozen sites — Maps, Eventbrite, AllEvents,
+Groupon, TripAdvisor, Time Out, the local subreddit — and **not one of them
+will sell you an API** for it. Every attempt to unify local listings has died
+on exactly that: you'd have to convince every platform to cooperate, and they
+have no reason to.
+
+And the answers are local in a way that ordinary requests cannot reach. The
+web personalises on where your traffic comes from and what you have clicked
+before. Someone who just moved has the wrong IP history and no click history,
+so the internet keeps showing them their old life.
+
+## The solution
+
+So this doesn't ask for permission. It opens **real browsers in the cloud,
+stands them at your coordinates**, and reads every source at the same time. A
+browser is a permissionless interface: if a site has a page, it can be read.
+
+Then ordinary, readable code turns what came back into a schedule — screened
+for whether it is near you, on your days, something you would actually go and
+do, and something you are old enough to get into.
+
+```
+   your request          13 cloud browsers            deterministic engine
+                         each proves its own
+"bowling at night"  ──▶  coordinates before   ──▶     screen · rank · book   ──▶  a weekend
+   Palm Coast, FL        it is allowed to             one gate, four checks
+                         search
+```
+
+Every recommendation is traceable to a line of text on a page a browser
+actually loaded, and the session that found it can be replayed.
 
 ```bash
 npm install
@@ -19,6 +49,37 @@ npm run dashboard         # http://localhost:5173
 ```
 
 ![The landing page](docs/landing.jpg)
+
+## How Solari is used
+
+Every browser in the fan-out is a Solari session. Five of the SDK's
+capabilities are load-bearing here, and one deliberately is not.
+
+| What | Where | Why it matters here |
+|---|---|---|
+| `solari.launch()` + patchright `BrowserContext` | `src/solari/pool.ts` | One session per source, and one per keyword for Maps. Thirteen at once on the Starter plan's twenty. |
+| `newContext({ geolocation, timezoneId, locale })` | `src/solari/geo.ts` | The override is what localises the browser. Not the proxy — see below. |
+| `stealth` | launch options | Five of six sources serve a different page, or none, to obvious automation. |
+| `proxy` (residential) | launch options | Only for the sources that block datacenter egress. Falls back to direct when the tunnel dies. |
+| `recording` (rrweb) | `src/solari/pool.ts` | Every session is replayable, so "watch it get found" is a real button and not a claim. |
+| `captcha` | launch options | On, and never needed on these six. Kept because the cost of being wrong is a dead lane. |
+
+What the SDK is **not** used for is as interesting: no LLM browsing loop, no
+"agent, go find me something to do". The browsers navigate and read; the
+decisions happen in ordinary code afterwards. See
+[No agent in the loop](#no-agent-in-the-loop-and-where-one-would-go).
+
+```ts
+// src/solari/geo.ts — the shape of every lane in the fan-out
+const browser = await solari.launch({ stealth: true, proxy, captcha: true, recording })
+const context = await browser.newContext({
+  geolocation: { latitude: place.lat, longitude: place.lng },
+  permissions: ["geolocation"],
+  timezoneId: place.timezone,
+  locale: "en-US",
+})
+// ...and nothing searches until the page confirms those coordinates back.
+```
 
 ## Why a cloud browser is load-bearing here
 
@@ -157,6 +218,33 @@ Three rules it holds to:
   distance can reject outright. A city name matched in free text cannot —
   "Orlando's Bar" is a real Tampa venue — so that tier only costs points.
 - **Findings carry their reason**, and become score components verbatim.
+
+### Read the label the site already wrote
+
+Google Maps prints its own type on nearly every result card — `Bowling
+alley`, `Cocktail bar`, `Business broker`, `Bowling supply shop`. This was
+parsing that descriptor, mapping it down to one of eleven coarse categories,
+and throwing the words away. Everything that then went wrong was an attempt
+to re-derive from a name what the page had already said in plain English:
+
+| In a real plan | The card said |
+|---|---|
+| "Palm Coast Lanes" stopped being bowling | `Bowling alley` |
+| "Big Frog Custom T-Shirts" took a Saturday morning | `Custom t-shirt store` |
+| "We Sell Restaurants" was filed under food | `Business broker` |
+| a bowling **supply** shop answered a search for bowling | `Bowling supply shop` |
+| Sam's Club was filed under nightlife | `Warehouse store` |
+
+Measured on one Palm Coast run: **44 of the 48** candidates that reached
+ranking carried a descriptor. It is now kept on the candidate, stored, and
+consulted first by the age gate, by the booking pass, and by a new check that
+refuses an errand — somewhere you go when something needs doing, rather than
+somewhere you go on a Saturday. Browsing still counts: bookshops, galleries,
+markets and malls stay.
+
+This is the cheapest kind of fix there is, and the reason it was available is
+that a real browser sees the whole page. An API would have returned a
+category enum.
 
 ### The 21+ switch
 
@@ -494,21 +582,66 @@ as its own config and drops the flag names, so a single dash runs with defaults
 and says nothing. The CLI detects that and tells you. Without npm in the way,
 one dash is enough: `npx tsx src/cli.ts plan "Tampa, FL" --explain`.
 
-## Claude is optional, and only at the edges
+## No agent in the loop, and where one would go
 
-`--ask` parses a free-text request, and a write-up turns the finished plan into
-prose. Both shell out to the `claude` CLI in headless mode, which works on a
-Pro/Max subscription **with no API key** — so cloning this needs exactly one
-secret.
+There is **no LLM anywhere in the decision path**. Nothing chooses your
+weekend but code you can read. The browsers navigate and read; screening,
+ranking, scheduling and learning are ordinary functions with named score
+components, and the same sentence produces the same plan every time.
 
-Ranking, itinerary assembly and learning are all deterministic code. An LLM in
-the ranking path would make results unreproducible and learning unmeasurable.
-If `claude` isn't installed, you lose prose and keep the plan.
+That is a deliberate choice rather than an omission, and it has been tested
+the hard way. The first version asked a model to read *when* a request wanted
+something. It answered `"evening"` on one run and nothing on the next, from
+the identical sentence — so "bowling at night" came back as bowling at ten in
+the morning, then correctly, then at ten again. A model is the right tool for
+reading an unusual request. It is the wrong tool for a decision that has to be
+the same every time. That read is now four lines of regex and it has never
+been wrong since.
 
-It does earn its place, though. On one run it read the finished plan and said
+Claude does appear twice, both times outside the decision path and both times
+optional: `--ask` widens a free-text request *after* the deterministic read
+has already had it, and a write-up turns the finished plan into prose. Both
+shell out to the `claude` CLI in headless mode, which works on a Pro/Max
+subscription with **no API key** — so cloning this needs exactly one secret.
+If `claude` isn't installed you lose the prose and keep the plan.
+
+It earns its keep even there. On one run it read the finished plan and said
 *"the party size is listed as 0 adults and 0 kids, which doesn't match a real
-weekend"* — which was a real bug in the server's query parsing that nothing
-else caught.
+weekend"* — a real bug in the server's query parsing that nothing else caught.
+Three times now the write-up has noticed something the planner did not.
+
+### At scale, an agent earns its place — in two specific jobs
+
+This runs for one city at a time against six sources. Scale it to a hundred
+cities and a long tail of sources and two seams start to hurt, both of them
+visible in this repo already:
+
+**1. Validating what came back.** Nothing in the pipeline knows what a listing
+*is*. It knows what a search returned and what the page said. That gap is the
+single largest source of wrong answers here — a bowling *supply* retailer
+scheduled as an afternoon out, a business brokerage filed under food, a
+warehouse store filed under nightlife. Every fix has been another pattern for
+a case we had met. A model asked *"is this a place someone would spend a
+Saturday, and would it card a twenty-year-old?"* answers correctly on the
+first try, for a listing nobody has seen before.
+
+**2. Helping with the selection itself.** The itinerary is greedy with a
+booking pass — good enough for six slots from a hundred candidates, and
+visibly not a model of taste. "A rainy Sunday with a seven-year-old and
+$60 left" is a judgement, and judgement is what a model is for.
+
+The design that keeps both honest is the same one the `timeOfDay` failure
+argues for: **the model labels, the code decides.** One batched call per run
+attaches facts to candidates — what kind of place this is, whether it is 21+,
+which request it answers — and every downstream decision stays the
+deterministic function it is now, consuming those labels exactly as it
+consumes a category today. Cache the label against the candidate id the store
+already keys on, and a venue is labelled once ever: the cost amortises to
+nothing and the same sentence still gives the same plan.
+
+It is not built, on purpose. At this size the deterministic version is more
+inspectable, cheaper, and better to demo — and the seams where it would go are
+marked in the code rather than guessed at here.
 
 ## Six things that cost an afternoon
 

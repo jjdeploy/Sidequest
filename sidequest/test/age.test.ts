@@ -125,6 +125,35 @@ describe("isAdultOnly: a name is evidence, a passing mention is not", () => {
   })
 })
 
+describe("what the source calls it beats what we guessed", () => {
+  // Google Maps prints its own type on every card — Bar, Brewery, Bowling
+  // alley, Warehouse store. We were parsing it, mapping it down to one of
+  // eleven coarse categories, and throwing the words away. It is the site's
+  // own claim about what a place is, and every guess in this file is a
+  // substitute for it.
+  test("an opaque name with a Bar on the card is a bar", () => {
+    // EBBE, Cork & Pint, The Odd, Balls. Nothing in those names says bar.
+    assert.equal(isAdultOnly({ title: "EBBE", kind: "Bar" }), true)
+    assert.equal(isAdultOnly({ title: "The Odd", kind: "Cocktail bar" }), true)
+  })
+
+  test("...and a Brewery on the card is not, whatever the name suggests", () => {
+    assert.equal(isAdultOnly({ title: "Bar Harbor Brewing", kind: "Brewery" }), false)
+    assert.equal(isAdultOnly({ title: "Keel Farms", kind: "Winery" }), false)
+  })
+
+  test("the descriptor outranks the category we inferred", () => {
+    // Chandler's Steakhouse came back categorised `drink`. The card says
+    // what it is.
+    assert.equal(isAdultOnly({ title: "Chandler's", kind: "Steak house", category: "drink" }), false)
+    assert.equal(isAdultOnly({ title: "Sam's Club", kind: "Warehouse store", category: "nightlife" }), false)
+  })
+
+  test("an explicit age gate still wins over everything", () => {
+    assert.equal(isAdultOnly({ title: "Tasting Room", kind: "Brewery", evidence: "21+ only" }), true)
+  })
+})
+
 describe("partyIsOver21: the flag is about everyone, not the person typing", () => {
   test("off unless it is ticked", () => {
     assert.equal(partyIsOver21(request()), false)

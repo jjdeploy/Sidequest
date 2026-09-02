@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS candidates (
   lat          REAL,
   lng          REAL,
   indoor       INTEGER,
+  kind         TEXT,
   first_seen   TEXT NOT NULL,
   last_seen    TEXT NOT NULL
 );
@@ -116,6 +117,19 @@ export class Store {
     // while a plan run is mid-write.
     this.db.exec("PRAGMA journal_mode = WAL;")
     this.db.exec(SCHEMA)
+
+    // The one migration this schema has needed.
+    //
+    // `CREATE TABLE IF NOT EXISTS` does nothing to a table that already
+    // exists, so a column added to the DDL above is invisible to every
+    // database created before it. Additive, idempotent, and cheap enough to
+    // run on every open — but if this list ever grows past two or three,
+    // it wants a real version counter rather than another entry.
+    const columns = new Set(
+      (this.db.prepare("PRAGMA table_info(candidates)").all() as Array<{ name: string }>)
+        .map((c) => c.name),
+    )
+    if (!columns.has("kind")) this.db.exec("ALTER TABLE candidates ADD COLUMN kind TEXT")
   }
 
   close(): void {
@@ -152,8 +166,8 @@ export class Store {
   saveResults(runId: string, results: SourceResult[]): void {
     const upsertCandidate = this.db.prepare(
       `INSERT INTO candidates
-         (id, title, url, category, price_usd, rating, review_count, lat, lng, indoor, first_seen, last_seen)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         (id, title, url, category, price_usd, rating, review_count, lat, lng, indoor, kind, first_seen, last_seen)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          title        = excluded.title,
          url          = excluded.url,
@@ -181,6 +195,9 @@ export class Store {
          lat          = COALESCE(excluded.lat, candidates.lat),
          lng          = COALESCE(excluded.lng, candidates.lng),
          indoor       = COALESCE(excluded.indoor, candidates.indoor),
+         -- Only Maps publishes one, so a later source without a descriptor
+         -- must not erase the one we have.
+         kind         = COALESCE(excluded.kind, candidates.kind),
          last_seen    = excluded.last_seen`,
     )
     const insertSighting = this.db.prepare(
@@ -206,6 +223,7 @@ export class Store {
             c.lat ?? null,
             c.lng ?? null,
             c.indoor === null ? null : c.indoor ? 1 : 0,
+            c.kind ?? null,
             c.scrapedAt,
             c.scrapedAt,
           )

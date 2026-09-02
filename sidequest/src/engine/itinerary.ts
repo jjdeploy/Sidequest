@@ -262,9 +262,15 @@ export function buildItinerary(
        * and it is still the bowling alley.
        */
       const tierOf = (s: Scored) => {
-        const byName = answersTo(want.term, s.candidate.title)
-        const byKind = s.candidate.category === want.category
-        return byName && byKind ? 2000 : byKind ? 1000 : byName ? 1 : 0
+        const c = s.candidate
+        // The source said so. Nothing below this is as good a signal, so a
+        // descriptor match does not need the category to agree with it —
+        // "AMF Beacon" typed `Bowling alley` and categorised `other` is
+        // still the bowling.
+        if (c.kind && answersTo(want.term, "", c.kind)) return 3000
+        const byName = answersTo(want.term, c.title)
+        const rightKind = c.category === want.category
+        return byName && rightKind ? 2000 : rightKind ? 1000 : byName ? 1 : 0
       }
 
       let best: { s: Scored; spot: (typeof openings)[number]; rank: number } | null = null

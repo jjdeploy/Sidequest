@@ -169,6 +169,10 @@ export const googleMaps: SourceTask = {
               // and took a slot in the plan. "other" is the honest answer when
               // neither the descriptor nor the name says anything.
               category: categoryFromMapsType(r.mapsType) ?? guessCategory(r.title, "other"),
+              // ...and keep the descriptor itself. Mapping it down to one of
+              // eleven categories and discarding the words lost the most
+              // reliable fact on the card: "Bowling alley" is not a guess.
+              kind: r.mapsType || undefined,
               evidence: r.text || r.title,
               priceRaw: r.priceText,
               ratingRaw: r.ratingLabel,

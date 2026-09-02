@@ -131,9 +131,14 @@ const ALSO_CALLED: Record<string, RegExp> = {
  * basement, so the word really is in the blurb. What a listing is called is a
  * claim about what it is; what its description mentions in passing is not.
  */
-export function answersTo(term: string, title: string): boolean {
+export function answersTo(term: string, title: string, kind?: string): boolean {
+  // The descriptor first, where there is one. "Bowling alley" answers
+  // "bowling" outright, with no alias table and no category guess in the
+  // path — it is the site saying what the place is.
+  const alias = ALSO_CALLED[term.toLowerCase()]
+  if (kind && (mentions(term, kind) || (alias?.test(kind) ?? false))) return true
   if (mentions(term, title)) return true
-  return ALSO_CALLED[term.toLowerCase()]?.test(title) ?? false
+  return alias?.test(title) ?? false
 }
 
 /**

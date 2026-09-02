@@ -205,6 +205,8 @@ export interface RankedView {
   url: string
   source: string
   category: string
+  /** The source's own type descriptor, where it published one. */
+  kind: string | null
   priceUsd: number | null
   rating: number | null
   reviewCount: number | null
@@ -241,6 +243,7 @@ function toView(s: Scored): RankedView {
     url: c.url,
     source: c.source,
     category: c.category,
+    kind: c.kind ?? null,
     priceUsd: c.priceUsd,
     rating: c.rating,
     reviewCount: c.reviewCount,
