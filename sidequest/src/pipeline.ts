@@ -233,6 +233,8 @@ export interface ItineraryView {
   notes: string[]
   /** What they asked for by name that the plan could not book, and why. */
   unmet: string[]
+  /** How many of the plan items published no price. `totalUsd` is a floor. */
+  unpriced: number
 }
 
 function toView(s: Scored): RankedView {
@@ -276,6 +278,7 @@ function itineraryView(it: Itinerary, budgetUsd: number): ItineraryView {
     budgetUsd,
     notes: it.notes,
     unmet: it.unmet,
+    unpriced: it.unpriced,
   }
 }
 

@@ -180,7 +180,7 @@ function closeWhen() {
 // Optional, always. See gpu.js — every one of these returns a handle whose
 // methods do nothing when WebGPU is unavailable, so nothing below branches
 // on whether it worked.
-import { mountHero, mountWait } from "/gpu.js"
+import { mountHero } from "/gpu.js"
 
 // ───────────────────────────────────────────────────────────────── state
 
@@ -206,7 +206,6 @@ const state = {
   explain: false,
   stream: null,
   heroGpu: null,
-  waitGpu: null,
   place: null,
   gathered: null,
   screened: null,
@@ -381,10 +380,6 @@ function start() {
   renderHere(null)
   screen("working")
 
-  // Mounted on the first run and kept for the session: the canvas has no
-  // size until its screen is displayed, and a surface built against a
-  // zero-width canvas is a device acquired for nothing.
-  if (!state.waitGpu) mountWait($("waitGpu")).then((gpu) => { state.waitGpu = gpu })
 
   const stream = new EventSource(`/api/plan?${q}`)
   state.stream = stream
@@ -594,17 +589,6 @@ function drawRing() {
       : ""
   }
 
-  // The shader behind all this is driven by the same three numbers, so the
-  // lights and the ring can never disagree about what has happened.
-  state.waitGpu?.set({
-    lit: gated,
-    sending: lanes.filter((l) => l.found !== null).length,
-    count: Math.max(lanes.length, 1),
-    // Saturates around a hundred: past that the core is as bright as it
-    // gets and the number in the middle carries the rest.
-    energy: Math.min(1, found / 100),
-  })
-
   const progress = lanes.length === 0 ? 0
     : lanes.reduce((n, l) => n + (l.endAt !== null ? 1 : l.gated > 0 ? 0.34 : 0), 0) / lanes.length
   const ring = $("ringFill")
@@ -744,9 +728,20 @@ function renderPlan(it) {
 
   const foot = $("planFoot")
   clear(foot)
+  // The total is a floor, and saying so is the difference between a number
+  // and a claim. Half of what a weekend costs is admission nobody publishes
+  // on a listing page — the Florida Aquarium took an afternoon and the plan
+  // read $0.
+  const unpriced = it.unpriced ?? 0
+  const total = Math.round(it.totalUsd)
   foot.append(
-    el("span", { class: "plan-total" }, `$${Math.round(it.totalUsd)}`),
+    el("span", { class: "plan-total" }, unpriced > 0 ? `$${total}+` : `$${total}`),
     el("span", {}, `of the $${it.budgetUsd} you had in mind`),
+    unpriced > 0
+      ? el("span", { class: "plan-note" },
+          `${unpriced} of these ${unpriced === 1 ? "publishes" : "publish"} no price, ` +
+          "so the real figure is higher. Nothing here is a guess.")
+      : null,
     ...it.notes.map((n) => el("span", { class: "plan-note" }, n)),
   )
 

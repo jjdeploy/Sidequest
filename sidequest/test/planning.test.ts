@@ -814,3 +814,34 @@ describe("a request the vocabulary has never heard of", () => {
     }
   })
 })
+
+describe("a total that says $0 is a lie about a paid attraction", () => {
+  test("things that published no price are counted, not treated as free", () => {
+    // The Florida Aquarium took an afternoon and the plan totalled $0.
+    // Maps publishes no admission price, so priceUsd is null — and types.ts
+    // is explicit that null means unknown and not free, which the itinerary
+    // was quietly ignoring in two places.
+    const it = buildItinerary(
+      [
+        scored(candidate({ id: "aquarium", title: "The Florida Aquarium", category: "family" }), 40),
+        scored(candidate({ id: "dinner", title: "Columbia", category: "food", priceUsd: 31 }), 30),
+        scored(candidate({ id: "park", title: "Riverwalk", category: "outdoors", priceUsd: 0 }), 20),
+      ],
+      request({ days: [WEEKEND[0]!] }), [],
+    )
+    const placed = it.days.flatMap((d) => d.items)
+    assert.equal(placed.length, 3)
+    // $31 per head for two, and nothing invented for the aquarium.
+    assert.equal(it.totalUsd, 62)
+    // But the fact that a number is missing has to survive to the page.
+    assert.equal(it.unpriced, 1)
+  })
+
+  test("a plan where everything published a price says so", () => {
+    const it = buildItinerary(
+      [scored(candidate({ id: "a", category: "food", priceUsd: 10 }), 30)],
+      request({ days: [WEEKEND[0]!] }), [],
+    )
+    assert.equal(it.unpriced, 0)
+  })
+})

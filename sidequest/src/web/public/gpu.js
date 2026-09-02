@@ -124,99 +124,6 @@ ${NOISE}
 }
 `
 
-/**
- * The waiting screen.
- *
- * Thirteen points on a circle, one per browser. A point is dark until its lane
- * confirms its coordinates, then it ignites and sends a pulse inward; the core
- * brightens as candidates arrive. `lit`, `sending` and `energy` are counts, not
- * per-lane state, which keeps the uniform to five floats and loses nothing —
- * at this size nobody is tracking which light is Eventbrite.
- */
-export const WAIT_WGSL = `
-struct Params {
-  time: f32,
-  aspect: f32,
-  lit: f32,      // lanes standing in the right city, 0..count
-  sending: f32,  // lanes that have reported back
-  count: f32,
-  energy: f32,   // 0..1, how much of the catalogue has arrived
-}
-@group(0) @binding(0) var<uniform> params: Params;
-
-${NOISE}
-
-const TAU = 6.283185307;
-
-fn glow(d: f32, r: f32, softness: f32) -> f32 {
-  return 1.0 - smoothstep(r, r + softness, d);
-}
-
-@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
-  // Centred and aspect-corrected, so the ring is a circle at any window size.
-  let p = (uv - vec2f(0.5)) * vec2f(params.aspect, 1.0) * 2.0;
-  let d = length(p);
-  let t = params.time;
-
-  var col = ${CREAM};
-
-  // A very slow warm haze, so the field is never flat white.
-  let haze = fbm(p * 0.9 + vec2f(0.0, t * 0.03));
-  col = mix(col, ${MANGO}, smoothstep(0.40, 1.05, haze) * 0.07);
-
-  let n = max(params.count, 1.0);
-  // Wide enough to frame the progress ring rather than collide with it: the
-  // count and the ring are the thing being read, and this is behind them.
-  let radius = 0.82;
-
-  var light = 0.0;
-
-  for (var i = 0; i < 16; i = i + 1) {
-    let fi = f32(i);
-    if (fi >= n) { break; }
-
-    let a = (fi / n) * TAU - 1.5707963;
-    let dir = vec2f(cos(a), sin(a));
-    let pos = dir * radius;
-
-    // Each light comes on when the count passes it, smoothly, so lanes
-    // landing together still read as separate arrivals.
-    let on = clamp(params.lit - fi, 0.0, 1.0);
-    let reported = clamp(params.sending - fi, 0.0, 1.0);
-    let breathe = 0.82 + 0.18 * sin(t * 1.5 + fi * 1.9);
-
-    let dl = length(p - pos);
-    // Hard centre, tight halo, wide bloom — a light rather than a smudge.
-    light = light + glow(dl, 0.012, 0.010) * on * 0.85;
-    light = light + glow(dl, 0.010, 0.055) * on * breathe * 0.45;
-    light = light + glow(dl, 0.0, 0.20) * on * breathe * 0.10;
-
-    // What a lane sends back, once it has something: a mote that leaves the
-    // light and runs inward, fading out well before the middle so it never
-    // arrives on top of the number being read there.
-    if (reported > 0.01) {
-      let trip = fract(t * 0.42 + fi * 0.31);
-      let mote = pos * (1.0 - trip * 0.72);
-      let fade = smoothstep(0.0, 0.12, trip) * (1.0 - smoothstep(0.55, 1.0, trip));
-      light = light + glow(length(p - mote), 0.006, 0.028) * reported * fade * 0.55;
-    }
-  }
-
-  // The ring the lights sit on, so the shape is legible before any are lit.
-  light = light + glow(abs(d - radius), 0.0, 0.004) * 0.09;
-
-  // A wide, soft lift under the middle that grows with what has been found.
-  // Not a disc: the count sits here, and anything with an edge competes with
-  // it. This is only ever a warming of the paper.
-  col = mix(col, ${MANGO}, (1.0 - smoothstep(0.0, 0.95, d)) * params.energy * 0.16);
-
-  col = mix(col, ${MANGO}, clamp(light, 0.0, 1.0) * 0.60);
-  col = mix(col, ${CORAL}, clamp(light - 0.45, 0.0, 1.0) * 0.85);
-
-  return vec4f(col, 1.0);
-}
-`
-
 /** A handle that does nothing, for every path where the GPU is unavailable. */
 const NOOP = { ok: false, set() {}, stop() {} }
 
@@ -366,7 +273,7 @@ export function gpuReport() {
     device: Boolean(device),
     looping,
     drawing: mounted.size,
-    canvases: ["heroGpu", "waitGpu"].map((id) => {
+    canvases: ["heroGpu"].map((id) => {
       const c = document.getElementById(id)
       return c
         ? `${id}: ${c.clientWidth}x${c.clientHeight}${c.classList.contains("is-live") ? " live" : " NOT live"}`
@@ -380,8 +287,4 @@ if (typeof window !== "undefined") window.sidequestGpu = gpuReport
 
 export function mountHero(canvas) {
   return mount(canvas, HERO_WGSL, { time: 0, fade: 1 })
-}
-
-export function mountWait(canvas) {
-  return mount(canvas, WAIT_WGSL, { time: 0, lit: 0, sending: 0, count: 13, energy: 0 })
 }

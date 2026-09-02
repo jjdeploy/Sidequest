@@ -69,6 +69,16 @@ export interface Itinerary {
    * empty rather than like the search came up short.
    */
   unmet: string[]
+  /**
+   * How many things in the plan published no price at all.
+   *
+   * `totalUsd` is a floor, not a total, and without this number nothing on
+   * the page says so. The Florida Aquarium took an afternoon and the plan
+   * read $0 — Maps publishes no admission price, types.ts is explicit that
+   * null means unknown rather than free, and the arithmetic here was
+   * quietly treating the two as the same thing.
+   */
+  unpriced: number
 }
 
 /** Something the user typed the word for, and the category it belongs to. */
@@ -209,6 +219,15 @@ export function buildItinerary(
 
   /** Cost for this party. Per person; a $40 ticket for a family of four is
    *  $160. */
+  /**
+   * What this costs the party, as far as anyone published.
+   *
+   * An unknown price contributes nothing, because the alternative is
+   * inventing a number and putting it in front of someone as if it were
+   * researched. What it must not do is disappear: every item this returns 0
+   * for without a published price is counted into `unpriced`, and the page
+   * says how many there were.
+   */
   const costOf = (s: Scored) => (s.candidate.priceUsd ?? 0) * heads
 
   // Booking.
@@ -396,7 +415,7 @@ export function buildItinerary(
       used.add(best.s.candidate.id)
       owed.delete(best.s.candidate.category)
       sourceUse.set(best.s.candidate.source, (sourceUse.get(best.s.candidate.source) ?? 0) + 1)
-      const cost = (best.s.candidate.priceUsd ?? 0) * heads
+      const cost = costOf(best.s)
       remainingBudget -= cost
       day.costUsd += cost
       day.items.push({
@@ -419,5 +438,9 @@ export function buildItinerary(
     notes.push("No forecast available for these dates — outdoor options weren't weather-adjusted.")
   }
 
-  return { days, totalUsd, notes, unmet }
+  const unpriced = days
+    .flatMap((d) => d.items)
+    .filter((i) => i.scored.candidate.priceUsd === null).length
+
+  return { days, totalUsd, notes, unmet, unpriced }
 }
