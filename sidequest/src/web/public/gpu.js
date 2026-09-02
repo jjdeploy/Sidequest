@@ -415,7 +415,7 @@ async function context() {
   if (!navigator.gpu) return null
   if (device) return device
   try {
-    vgpu = vgpu ?? (await import("/vendor/vgpu/index.js"))
+    vgpu = vgpu ?? (await import("vgpu"))
     device = await vgpu.init()
     clock = vgpu.clock(device)
   } catch (err) {

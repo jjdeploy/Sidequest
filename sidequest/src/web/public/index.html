@@ -9,6 +9,23 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/app.css">
+
+<!-- vgpu's deeper modules import "@vgpu/core" and "@vgpu/wgsl/reflect-source".
+     A browser cannot resolve a bare specifier on its own, so this is the map
+     that lets it: the server hands node_modules out under /vendor/, and the
+     page keeps loading real ESM with no bundler in the middle. Without it the
+     dynamic import throws, every canvas falls back to its no-op handle, and
+     the graphic silently never appears. -->
+<script type="importmap">
+{
+  "imports": {
+    "vgpu": "/vendor/vgpu/dist/index.js",
+    "@vgpu/core": "/vendor/@vgpu/core/dist/index.js",
+    "@vgpu/wgsl": "/vendor/@vgpu/wgsl/dist/index.js",
+    "@vgpu/wgsl/reflect-source": "/vendor/@vgpu/wgsl/dist/runtime/reflect-source.js"
+  }
+}
+</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='15' fill='%23f4552c'/><path d='M16 7 V17.4' stroke='%23fff' stroke-width='3.8' stroke-linecap='round'/><circle cx='16' cy='23.2' r='2.2' fill='%23fff'/></svg>">
 </head>
 <body data-screen="landing">

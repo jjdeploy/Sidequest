@@ -37,14 +37,17 @@ const PUBLIC_DIR = resolve(fileURLToPath(new URL("./public", import.meta.url)))
 /**
  * vgpu, served straight out of node_modules.
  *
- * Its dist is 47 ESM files that import each other by relative path and
- * nothing else — no bare specifiers — so a browser can load it as-is and this
- * page keeps its no-build-step promise. The alternative was a CDN, and a
- * dashboard that needs the network to draw its own background is worse than
- * one that reads a folder.
+ * Its dist is ESM that a browser can load as-is, which keeps this page on
+ * its no-build-step promise — but only most of the way. The deeper modules
+ * import "@vgpu/core" and "@vgpu/wgsl/reflect-source", which a browser has
+ * no way to resolve on its own, so index.html carries an import map and this
+ * serves the whole node_modules tree under /vendor/ rather than one package.
+ *
+ * The alternative was a CDN, and a dashboard that needs the network to draw
+ * its own background is worse than one that reads a folder.
  */
-const VGPU_DIR = resolve(fileURLToPath(new URL("../../node_modules/vgpu/dist", import.meta.url)))
-const VGPU_PREFIX = "/vendor/vgpu/"
+const NODE_MODULES = resolve(fileURLToPath(new URL("../../node_modules", import.meta.url)))
+const VGPU_PREFIX = "/vendor/"
 const DB_PATH = process.env.SIDEQUEST_DB ?? resolve(process.cwd(), "data", "sidequest.db")
 const PORT = Number(process.env.PORT ?? 5173)
 
@@ -99,7 +102,7 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
 async function serveStatic(res: ServerResponse, pathname: string): Promise<void> {
   // Two roots, the same containment rule for both.
   const vendored = pathname.startsWith(VGPU_PREFIX)
-  const root = vendored ? VGPU_DIR : PUBLIC_DIR
+  const root = vendored ? NODE_MODULES : PUBLIC_DIR
   const rel = vendored
     ? pathname.slice(VGPU_PREFIX.length)
     : pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "")
