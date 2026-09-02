@@ -16,18 +16,17 @@ import { isAdultOnly, partyIsOver21 } from "../src/engine/age.js"
 import { request } from "./helpers.js"
 
 describe("isAdultOnly: a name is evidence, a passing mention is not", () => {
+  // The line is STRICTLY 21+ — would they card you at the door. Not "does
+  // this place sell drink", which is nearly everywhere.
   const adult = [
     "The Independent Bar & Cafe",
-    "Cigar City Brewing",
-    "Coppertail Brewery",
     "Angel's Share Speakeasy",
     "Ybor City Wine Bar",
-    "Hyde Park Taproom",
     "Hattricks Sports Bar",
     "Bar Louie",
-    "The Dubliner Irish Pub",
-    "Keel Farms Cidery",
     "Club Prana",
+    "Ciro's Cocktail Lounge",
+    "Seminole Hard Rock Casino",
     "Tampa Bay Brewery Crawl",
     "Sunset Wine Tasting on the Riverwalk",
   ]
@@ -47,6 +46,19 @@ describe("isAdultOnly: a name is evidence, a passing mention is not", () => {
     "Tampa Riverwalk",
     "Glazer Children's Museum",
     "Ybor City Book Club",
+    // Everything below sells drink and lets a family in anyway.
+    "Cigar City Brewing",
+    "Coppertail Brewery",
+    "Hyde Park Taproom",
+    "The Dubliner Irish Pub",
+    "Keel Farms Cidery",
+    "Chandler's Steakhouse and Seafood",
+    "Cantina Louie",
+    "Hi-Wire Brewing RAD Beer Garden",
+    "New Belgium Brewing Company",
+    "Hidden Springs Ale Works",
+    "Old Coast Ales",
+    "Cellarest Beer Project",
   ]
   for (const title of allAges) {
     test(`${title} is not`, () => {
@@ -88,9 +100,11 @@ describe("isAdultOnly: a name is evidence, a passing mention is not", () => {
     }
   })
 
-  test("...but a brewery with a kitchen is still a brewery", () => {
-    assert.equal(isAdultOnly({ title: "Hi-Wire Brewing RAD Beer Garden & Kitchen" }), true)
-    assert.equal(isAdultOnly({ title: "Wedge Brewing Company Pizzeria" }), true)
+  test("a brewery tour is 21+ even though the brewery is not", () => {
+    // The room admits anyone; the tasting at the end does not.
+    assert.equal(isAdultOnly({ title: "Wedge Brewing Company" }), false)
+    assert.equal(isAdultOnly({ title: "Wedge Brewing Company Brewery Tour" }), true)
+    assert.equal(isAdultOnly({ title: "Highland Brewing Beer Tasting" }), true)
   })
 
   test("a lounge is only a lounge when it says what kind", () => {
@@ -98,10 +112,16 @@ describe("isAdultOnly: a name is evidence, a passing mention is not", () => {
     assert.equal(isAdultOnly({ title: "Ash & Ale Cigar Lounge" }), true)
   })
 
-  test("the drink and nightlife categories are adult by construction", () => {
-    assert.equal(isAdultOnly({ title: "Place 7", category: "drink" }), true)
+  test("the category is the last word, and only nightlife is decisive", () => {
+    // A name that says nothing leaves only the category to go on, and a bar
+    // with an opaque name — EBBE, Cork & Pint, The Odd — is exactly the case
+    // this covers.
+    assert.equal(isAdultOnly({ title: "Cork & Pint", category: "drink" }), true)
     assert.equal(isAdultOnly({ title: "Place 8", category: "nightlife" }), true)
     assert.equal(isAdultOnly({ title: "Place 9", category: "food" }), false)
+    // ...but the same bucket holds every brewery in town, so the name wins.
+    assert.equal(isAdultOnly({ title: "Coppertail Brewing Co.", category: "drink" }), false)
+    assert.equal(isAdultOnly({ title: "Chandler's Steakhouse", category: "drink" }), false)
   })
 })
 

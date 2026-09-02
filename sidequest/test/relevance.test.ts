@@ -180,20 +180,30 @@ describe("age: the 21+ flag is a gate, not a preference", () => {
     return { fatal: v.fatal, age: v.findings.find((f) => f.dimension === "age")! }
   }
 
-  test("a brewery is refused outright when nobody said they are 21", async () => {
+  test("a bar is refused outright when nobody said they are 21", async () => {
     // Refused, not demoted. "Never show up" is the whole promise of the
     // flag, and only a fatal verdict keeps it out of the store as well as
     // out of the plan.
-    const v = await ageOf({ title: "Coppertail Brewing Co.", category: "drink" })
+    const v = await ageOf({ title: "Bar Louie", category: "drink" })
     assert.equal(v.age.state, "fail")
     assert.equal(v.age.fatal, true)
     assert.equal(v.fatal, true)
   })
 
-  test("the same brewery is fine once the box is ticked", async () => {
-    const v = await ageOf({ title: "Coppertail Brewing Co.", category: "drink" }, adultCtx)
+  test("the same bar is fine once the box is ticked", async () => {
+    const v = await ageOf({ title: "Bar Louie", category: "drink" }, adultCtx)
     assert.equal(v.age.state, "ok")
     assert.equal(v.fatal, false)
+  })
+
+  test("a brewery is not a bar, and stays in either way", async () => {
+    // The gate is strictly 21+. A taproom lets a family in and declines to
+    // serve half of it, which is not a reason to delete it from a weekend.
+    for (const context of [ctx, adultCtx]) {
+      const v = await ageOf({ title: "Coppertail Brewing Co.", category: "drink" }, context)
+      assert.equal(v.age.state, "ok")
+      assert.equal(v.fatal, false)
+    }
   })
 
   test("everything else is untouched either way", async () => {

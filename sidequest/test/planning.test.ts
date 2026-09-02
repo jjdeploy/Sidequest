@@ -388,11 +388,16 @@ describe("a time phrase is a time, not a mood", () => {
     // gate drops the nightlife terms first and the contamination is invisible
     // — still fixed, but fixed by the wrong rule to be testing.
     const party = { adults: 2, kids: 0, over21: true }
-    const withTime = requestedCategories(buildKeywords(request({ party, vibes: ["bowling at night"] }), 8))
-    const stripped = requestedCategories(buildKeywords(request({ party, vibes: [stripTimeWords("bowling at night")] }), 8))
-    assert.ok(withTime.has("nightlife"), "the whole sentence drags nightlife in")
-    assert.ok(!stripped.has("nightlife"), `stripped still asked for: ${[...stripped].join(", ")}`)
-    assert.ok(stripped.has("active"), "but it still asks for bowling")
+    const withTime = buildKeywords(request({ party, vibes: ["bowling at night"] }), 8).map((k) => k.term)
+    const stripped = buildKeywords(request({ party, vibes: [stripTimeWords("bowling at night")] }), 8).map((k) => k.term)
+    // Read at the search level, which is where the contamination still
+    // shows: requestedCategories now only counts the words they typed, so
+    // the inferred nightlife terms no longer reserve a slot either way.
+    // "dance clubs" comes only from the nightlife vibe. Cocktail bars and
+    // breweries are on this list either way — the 21+ party puts them there.
+    assert.ok(withTime.includes("dance clubs"), "the whole sentence drags nightlife in")
+    assert.ok(!stripped.includes("dance clubs"), `stripped still asked for: ${stripped.join(", ")}`)
+    assert.ok(stripped.includes("bowling"), "but it still asks for bowling")
   })
 
   test("the whole path holds together: text in, evening bowling out", () => {
@@ -463,12 +468,15 @@ describe("an event goes in the slot it actually starts in", () => {
 describe("buildKeywords: don't spend a browser on a bar you can't enter", () => {
   const terms = (r: Parameters<typeof buildKeywords>[0]) => buildKeywords(r).map((k) => k.term)
 
-  test("a nightlife request finds nothing to search when the party isn't 21+", () => {
+  test("a nightlife request stops asking for bars when the party isn't 21+", () => {
     // The gate would throw these results away anyway. Searching for them
     // first burns browsers out of a budget of eight — the expensive resource
     // spent on candidates that are already decided.
+    //
+    // Breweries are not on that list: they are not strictly 21+, so they are
+    // still worth a search and still worth a slot.
     const t = terms(request({ vibes: ["nightlife"] }))
-    assert.ok(!t.some((x) => /bar|brewer|club/.test(x)), `still asking for: ${t.join(", ")}`)
+    assert.ok(!t.some((x) => /bar|club/.test(x)), `still asking for: ${t.join(", ")}`)
   })
 
   test("...and still comes back with a full set of terms", () => {
@@ -511,5 +519,77 @@ describe("buildItinerary: a brewery is not a ten-in-the-morning plan", () => {
     const slots = it.days.flatMap((d) => d.items).filter((i) => i.scored.candidate.id === "brew")
     assert.equal(slots.length, 1, "it should still be in the weekend somewhere")
     assert.notEqual(slots[0]!.slot, "Morning")
+  })
+})
+
+describe("two things asked for, two nights", () => {
+  // "bowling at night, clubbing the other night" came back with an ale
+  // lounge one night and no bowling at all.
+  //
+  // The vibe vocabulary expands a typed word into a family of searches, and
+  // "clubbing" alone pulls in cocktail bars, live music venues, dance clubs
+  // and breweries. All four are marked asked-for, so the plan owed FIVE
+  // categories a reserved evening slot, held all five out of the other four
+  // slots with the matching penalty, and had two evenings to settle it in.
+  // Bowling lost the auction and then had nowhere else to go.
+  const ask = "bowling at night, clubbing the other night"
+
+  test("only the words they actually typed reserve a slot", () => {
+    const asked = requestedCategories(buildKeywords(
+      request({ vibes: [stripTimeWords(ask)], party: { adults: 2, kids: 0, over21: true } }), 8))
+    assert.deepEqual([...asked].sort(), ["active", "nightlife"])
+  })
+
+  test("...and the searches themselves still widen", () => {
+    // The expansion is good — it is what finds a club in a town that calls
+    // it something else. It just should not be mistaken for a request.
+    const t = buildKeywords(
+      request({ vibes: [stripTimeWords(ask)], party: { adults: 2, kids: 0, over21: true } }), 8,
+    ).map((k) => k.term)
+    assert.ok(t.includes("bowling"), t.join(", "))
+    assert.ok(t.some((x) => /bars|music|brewer/.test(x)), t.join(", "))
+  })
+
+  test("both of them get a night", () => {
+    const bowling = scored(candidate({ id: "lanes", category: "active" }), 6)
+    const club = scored(candidate({ id: "club", category: "nightlife" }), 6)
+    const filler = Array.from({ length: 14 }, (_, i) =>
+      scored(candidate({ id: `f-${i}`, category: i % 2 ? "outdoors" : "food", rating: 4.9, reviewCount: 9000 }), 40 - i))
+    const it = buildItinerary(
+      [bowling, club, ...filler],
+      request({ party: { adults: 2, kids: 0, over21: true } }),
+      [], new Set(["active", "nightlife"]), "evening",
+    )
+    const placed = it.days.flatMap((d) => d.items.map((i) => [i.slot, i.scored.candidate.id]))
+    assert.ok(placed.some(([slot, id]) => id === "lanes" && slot === "Evening"), JSON.stringify(placed))
+    assert.ok(placed.some(([slot, id]) => id === "club" && slot === "Evening"), JSON.stringify(placed))
+  })
+
+  test("no more reservations than there are nights to honour them in", () => {
+    // Five categories owed a slot and two evenings to put them in. The four
+    // that lose are still held out of every daytime slot by the penalty that
+    // was keeping them free for an evening they are never going to get — so
+    // they vanish from the plan entirely, which is what happened to the
+    // bowling. A reservation nothing can honour is just a ban.
+    const owed = ["active", "culture", "drink", "music", "nightlife"] as const
+    const wanted = owed.map((category, i) =>
+      scored(candidate({ id: `w-${i}`, category }), 40))
+    const weak = Array.from({ length: 8 }, (_, i) =>
+      scored(candidate({ id: `weak-${i}`, category: i % 2 ? "outdoors" : "food" }), 5))
+
+    const it = buildItinerary(
+      [...wanted, ...weak],
+      request({ party: { adults: 2, kids: 0, over21: true } }),
+      [], new Set(owed), "evening",
+    )
+
+    const daytime = it.days
+      .flatMap((d) => d.items)
+      .filter((i) => i.slot !== "Evening")
+      .map((i) => i.scored.candidate.id)
+    assert.ok(
+      daytime.some((id) => id.startsWith("w-")),
+      `every asked-for category was held out of the daytime: ${daytime.join(", ")}`,
+    )
   })
 })

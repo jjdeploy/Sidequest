@@ -96,7 +96,25 @@ export function buildItinerary(
    * one-time preference, and the category drops out as soon as it's placed.
    * One guaranteed slot each, not six.
    */
-  const owed = new Set(requested)
+  /**
+   * ...but never more of them than there are slots to honour them in.
+   *
+   * The reservation has two halves: a large bonus in the right slot, and an
+   * equal push OUT of the wrong ones to keep the category free until its hour
+   * comes round. The second half is only defensible while the hour is still
+   * coming. "bowling at night, clubbing the other night" expanded to five
+   * owed categories chasing two evenings — the three that lost were still
+   * being held out of the four daytime slots for an evening they were never
+   * going to get, so they disappeared from the plan altogether. That is how a
+   * request for bowling produced a weekend with no bowling in it.
+   *
+   * Set iteration is insertion order, and engine/keywords.ts hands these over
+   * strongest first, so the ones that survive the cut are the ones asked for
+   * hardest. The rest are ordinary candidates again: no bonus, no penalty,
+   * free to land wherever they fit.
+   */
+  const honourable = timeOfDay ? req.days.length : SLOTS.length * req.days.length
+  const owed = new Set([...requested].slice(0, honourable))
 
   const byDate = new Map(weather.map((w) => [w.date, w]))
   const notes: string[] = []

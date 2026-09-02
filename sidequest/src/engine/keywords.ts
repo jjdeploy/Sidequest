@@ -47,6 +47,16 @@ export interface Keyword {
   because: string
   /** Seed priority, 0..1. Decides which terms survive the limit. */
   weight: number
+  /**
+   * They typed the word for this one themselves.
+   *
+   * A flag and not a high weight, because weight is already carrying two
+   * other jobs — seed priority, and a corroboration bump when two vibes ask
+   * for the same term. That bump takes 0.85 to 1.00, which sailed straight
+   * over the numeric tier this replaced and put an inferred cocktail bar
+   * back among the things the user had asked for.
+   */
+  said?: boolean
 }
 
 /** Vibe word -> the searches it justifies. Matched as substrings, so "date
@@ -104,6 +114,39 @@ const MIN_TERMS = 5
 const ASKED_FOR = 0.75
 
 /**
+ * Marking the terms the user typed the word for themselves.
+ *
+ * The vocabulary above expands one word into a family of searches, which is
+ * exactly what you want a search to do — "clubbing" should go looking for
+ * dance clubs AND cocktail bars AND live music, because a town might call
+ * its one club any of those. It is not what you want a REQUEST to do.
+ *
+ * "bowling at night, clubbing the other night" expanded to five asked-for
+ * categories. engine/itinerary.ts reserves an evening slot for each and
+ * holds each out of every other slot to keep it free — so five reservations
+ * chased two evenings, an inferred cocktail bar won one of them, and the
+ * bowling the user had actually typed was pushed out of the remaining four
+ * slots by its own reservation and never appeared at all.
+ *
+ * So the expansion still searches, and only the words they said reserve.
+ */
+
+/**
+ * Did they write this term, near enough?
+ *
+ * Crude stemming on purpose. "clubbing" has to reach the term "dance clubs"
+ * and "bowling" has to reach "bowling", and nothing subtler than a common
+ * prefix is needed for that. The four-character floor keeps "bar" out of
+ * "barbecue" and stops two-letter words matching everything.
+ */
+function wasTyped(term: string, said: string): boolean {
+  return term.toLowerCase().split(/\s+/).some((w) => {
+    const stem = w.replace(/(?:ies|ing|es|s)$/, "")
+    return stem.length >= 4 && said.includes(stem)
+  })
+}
+
+/**
  * The categories the user actually asked about.
  *
  * Search intent has to reach ranking, not just querying. Typing "bowling"
@@ -113,7 +156,12 @@ const ASKED_FOR = 0.75
  * somebody asked for bowling.
  */
 export function requestedCategories(keywords: Keyword[]): Set<Category> {
-  return new Set(keywords.filter((k) => k.weight >= ASKED_FOR).map((k) => k.category))
+  // When any term came from their own words, those are the request and the
+  // rest of the expansion is just search. With no free text — mood chips
+  // only — nothing reaches that tier and the vibes are all we have.
+  const said = keywords.filter((k) => k.said)
+  const source = said.length > 0 ? said : keywords.filter((k) => k.weight >= ASKED_FOR)
+  return new Set(source.map((k) => k.category))
 }
 
 /**
@@ -283,6 +331,14 @@ export function buildKeywords(req: PlanRequest, limit = 8): Keyword[] {
       if (out.size >= MIN_TERMS) break
       add(term, category, because, 0.45)
     }
+  }
+
+  // Promote the terms they wrote the word for. Done here rather than in the
+  // vibe loop because a term can arrive from several vibes at once, and what
+  // matters is whether the finished term is one they said.
+  const said = req.vibes.join(" ").toLowerCase()
+  for (const k of out.values()) {
+    if (wasTyped(k.term, said)) k.said = true
   }
 
   const avoid = req.avoid.map((a) => a.toLowerCase()).filter(Boolean)

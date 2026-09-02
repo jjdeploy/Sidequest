@@ -166,11 +166,18 @@ weather demotes a park. This one removes things: leave 21+ off and nothing
 that would card you reaches the plan at all. Not ranked low, not greyed out,
 not sitting in the catalogue underneath. Absent.
 
+The line is **strictly 21+** — the rooms that would card you at the door.
+Bars, nightclubs, clubs, speakeasies, casinos, cigar and hookah lounges, and
+the events that are a tasting in disguise. Not restaurants, whatever they are
+called and however good the bar in them is; not breweries, taprooms, wineries
+or pubs, which admit a family and simply decline to serve half of it. "Does
+this place sell drink" is nearly everywhere and is not the question.
+
 Which means reading a listing's age with no field that says so, and the two
 halves of a listing are worth very different amounts:
 
-- **The name is evidence.** "Coppertail Brewing Co." is a brewery. A place
-  called a taproom is a taproom.
+- **The name is evidence.** "Bar Louie" is a bar; "Solid Grill & Bar" is a
+  grill. Which word comes first is the whole difference.
 - **The blurb is not.** Evidence text mentions a bar constantly — "cash bar",
   "full bar" — at weddings, food halls and street festivals anyone can walk
   into. Matching venue words there would quietly delete the family end of the

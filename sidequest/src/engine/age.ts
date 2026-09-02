@@ -6,6 +6,13 @@
  * party has not said everyone is 21, a bar does not appear in the plan —
  * not low down, not greyed out, not in the catalogue underneath. Absent.
  *
+ * Which makes the line it draws matter, and the line is STRICTLY 21+ — the
+ * rooms that would card you at the door. Bars, nightclubs, clubs,
+ * speakeasies, casinos, cigar and hookah lounges. Not restaurants, whatever
+ * they are called and however good the bar in them is; not breweries,
+ * taprooms, wineries or pubs, all of which let a family in and simply
+ * decline to serve half of it.
+ *
  * So it is enforced in the admission gate (engine/relevance.ts), where a
  * fatal verdict keeps a candidate out of the plan AND out of the store, and
  * it is enforced a second time in engine/keywords.ts — not for safety, but
@@ -51,9 +58,31 @@ export function partyIsOver21(req: PlanRequest): boolean {
 const AGE_GATE =
   /(?<![$£€.\d])\b(?:18|19|20|21)\s*\+|\b(?:18|19|20|21)\s*(?:and|&)\s*(?:over|up|older)\b|\bmust be 21\b|\b21 to enter\b|\badults?[ -]only\b|\bno minors\b/i
 
-/** Places whose whole business is a drink. Matched against the NAME only. */
-const DRINK_VENUE =
-  /\b(?:pubs?|gastropubs?|taverns?|brewer(?:y|ies)|brewing|brewpubs?|aleworks?|beer (?:garden|hall)|taprooms?|tap house|distiller(?:y|ies)|winer(?:y|ies)|cider(?:y|ies)|meader(?:y|ies)|cocktails?|speakeas(?:y|ies)|saloons?|cantinas?|night ?clubs?|dance clubs?|strip clubs?|hookah|cigars?|casinos?|dispensar(?:y|ies)|smoke shop)\b|\b(?:cocktail|hookah|cigar|whisk(?:e)?y|wine|champagne) lounges?\b|^\s*club\s+\w/i
+/**
+ * Rooms that turn a twenty-year-old away at the door. The NAME only.
+ *
+ * The test is not "does drink get sold here" — nearly everywhere sells
+ * drink. It is whether they would card you to get in. A bar would. A
+ * nightclub would. A brewery taproom would not, a winery would not, and a
+ * restaurant with a bar in it certainly would not: those admit anyone and
+ * simply decline to serve the under-21s, which is not the same thing and is
+ * not a reason to delete them from a weekend.
+ */
+const ADULT_VENUE =
+  /\b(?:taverns?|saloons?|speakeas(?:y|ies)|cocktails?|night ?clubs?|dance clubs?|strip clubs?|hookah|cigars?|casinos?|dispensar(?:y|ies)|smoke shop)\b|\b(?:cocktail|hookah|cigar|whisk(?:e)?y|martini) lounges?\b|^\s*club\s+\w/i
+
+/**
+ * Drink you can bring a fourteen-year-old to.
+ *
+ * Checked before the venue list and before the category, because both used
+ * to call these adult and both were wrong. A brewery taproom, a cidery, a
+ * winery tasting room and an Irish pub all let minors in — the under-21s
+ * just drink something else. Deleting a town's breweries from a family
+ * weekend removed some of the best things in it for no reason anyone at the
+ * door would recognise.
+ */
+const ALL_AGES_DRINK =
+  /\b(?:brewer(?:y|ies)|brewing|brewpubs?|ale ?works?|\bales\b|beers?|taprooms?|tap house|winer(?:y|ies)|vineyards?|cider(?:y|ies)|meader(?:y|ies)|distiller(?:y|ies)|pubs?|gastropubs?|cantinas?)\b/i
 
 /**
  * Clubs that are not that kind of club.
@@ -119,18 +148,29 @@ export function isAdultOnly(x: { title: string; evidence?: string; category?: Ca
   if (INNOCUOUS_CLUB.test(x.title)) return false
 
   const name = x.title
-  if (DRINK_EVENT.test(name)) return true
-  if (DRINK_VENUE.test(name)) return true
 
+  // A tasting is a tasting even when the room around it is all-ages: a
+  // brewery you can walk a child into still runs a 21+ tour.
+  if (DRINK_EVENT.test(name)) return true
+
+  // ...and otherwise the brewery is just a brewery.
+  if (ALL_AGES_DRINK.test(name)) return false
+
+  if (ADULT_VENUE.test(name)) return true
+
+  // A bar inside a restaurant is an amenity. Which word comes first is what
+  // separates it from a bar that happens to have a kitchen.
   const bar = name.search(A_BAR)
   const food = name.search(EATERY)
   if (food !== -1 && (bar === -1 || food < bar)) return false
 
-  // Our own categories. `drink` and `nightlife` are assigned from a closed
-  // vocabulary, so they are adult by construction — but only once the name
-  // has had its say, because the guess that produced them is a keyword match
-  // too, and it filed a steakhouse under drink.
-  if (x.category === "drink" || x.category === "nightlife") return true
+  // Our own categories, last and least. `nightlife` is a closed vocabulary —
+  // night clubs, dance clubs, DJs — so it is adult by construction. `drink`
+  // is not: the same bucket holds Coppertail Brewing and a steakhouse, which
+  // is why it only counts once the name has had every chance to say what it
+  // is. Left to itself it would take the breweries back out.
+  if (x.category === "nightlife") return true
+  if (x.category === "drink" && !EATERY.test(name)) return true
 
   return A_BAR.test(name) && !NOT_A_BAR.test(name)
 }
