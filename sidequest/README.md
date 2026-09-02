@@ -48,6 +48,10 @@ cp .env.example .env      # add your SOLARI_API_KEY
 npm run dashboard         # http://localhost:5173
 ```
 
+**Demo:** [`docs/demo-script.md`](docs/demo-script.md) — a three-minute
+walkthrough with the shots in order. The same city and sentence give the same
+plan every time, so a rehearsed take matches the real one.
+
 ![The landing page](docs/landing.jpg)
 
 ## How Solari is used
