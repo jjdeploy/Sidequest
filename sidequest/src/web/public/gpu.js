@@ -108,13 +108,13 @@ ${NOISE}
   // sitting on: high thresholds and low mixes leave most of the frame cream,
   // so the colour only shows where the field peaks.
   var col = ${CREAM};
-  col = mix(col, ${MANGO}, smoothstep(0.42, 0.95, f) * 0.30);
-  col = mix(col, ${CORAL}, smoothstep(0.56, 1.08, f + 0.30 * r.x) * 0.22);
-  col = mix(col, ${ROSE}, smoothstep(0.74, 1.22, f + 0.26 * q.y) * 0.08);
+  col = mix(col, ${MANGO}, smoothstep(0.48, 1.00, f) * 0.19);
+  col = mix(col, ${CORAL}, smoothstep(0.64, 1.14, f + 0.30 * r.x) * 0.13);
+  col = mix(col, ${ROSE}, smoothstep(0.80, 1.28, f + 0.26 * q.y) * 0.05);
 
   // A cool counterweight in the low corner, so the whole field is not one
   // temperature.
-  col = mix(col, ${SEA}, smoothstep(0.26, 0.02, f) * 0.045);
+  col = mix(col, ${SEA}, smoothstep(0.26, 0.02, f) * 0.03);
 
   // Softens only the strip the sticky header sits over. At 0.45 this was
   // fading out the top half of the hero — which is where the headline is,
