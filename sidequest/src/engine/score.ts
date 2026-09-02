@@ -251,6 +251,11 @@ export function rank(candidates: Candidate[], ctx: ScoreContext): Scored[] {
       lng: prev.lng ?? c.lng,
       address: prev.address ?? c.address,
       indoor: prev.indoor ?? c.indoor,
+      // Only Maps publishes a type descriptor, and whichever sighting
+      // happened to arrive first won every field it did not name. A
+      // TripAdvisor row landing ahead of the Maps one deleted the single
+      // most reliable fact on the candidate.
+      kind: prev.kind ?? c.kind,
       // Prefer the longest evidence: it's the one that actually explains why.
       evidence: c.evidence.length > prev.evidence.length ? c.evidence : prev.evidence,
     })

@@ -17,7 +17,7 @@
  */
 import { randomUUID } from "node:crypto"
 import { buildItinerary, type Itinerary } from "./engine/itinerary.js"
-import { buildKeywords, requestedCategories, stripTimeWords, timeOfDayFrom, type Keyword } from "./engine/keywords.js"
+import { blockedByAgeGate, buildKeywords, requestedCategories, stripTimeWords, timeOfDayFrom, understoodNothing, type Keyword } from "./engine/keywords.js"
 import { isAdultOnly, partyIsOver21 } from "./engine/age.js"
 import { describeTaste } from "./engine/learn.js"
 import { makeLocalityResolver } from "./engine/localities.js"
@@ -480,6 +480,29 @@ export async function runPlan(
     .filter((k) => k.said)
     .map((k) => ({ term: k.term, category: k.category }))
   const itinerary = buildItinerary(ranked, req, weather, ctx.requested, req.timeOfDay, required)
+
+  // ...and what the 21+ switch cost them, in the words they used.
+  //
+  // These never reach `required` — the query builder refuses to search for
+  // them at all — so the itinerary has no way to know they were asked for.
+  // Without this a request for a club comes back as a weekend with no club
+  // and no reason given, which is the one thing `unmet` is for.
+  // ...and when the request was never understood at all.
+  //
+  // "skiing at night" in Tampa produced a full weekend and total silence.
+  // Having no skiing is a fine answer; giving no answer is not.
+  if (req.vibes.length > 0 && understoodNothing(keywords)) {
+    itinerary.unmet.push(
+      `Nothing here matched "${req.vibes.join(", ")}" — so this is a general ` +
+        `weekend for ${req.place.city} rather than the one you asked for.`,
+    )
+  }
+
+  for (const k of blockedByAgeGate(req)) {
+    itinerary.unmet.push(
+      `You asked for ${k.term} — those are 21+ only, and the 21+ switch is off.`,
+    )
+  }
   const planId = randomUUID()
   store.savePlan(planId, runId, `${req.place.label} ${req.days[0]}`, itinerary.days)
   emit({ type: "itinerary", planId, runId, itinerary: itineraryView(itinerary, req.budgetUsd) })

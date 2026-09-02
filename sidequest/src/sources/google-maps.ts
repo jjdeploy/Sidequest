@@ -185,8 +185,15 @@ export const googleMaps: SourceTask = {
               // category-based fallback in the scorer decide.
               indoor: null,
             })
-            // First sighting wins: earlier keywords have higher weight, so the
-            // term that best justifies a venue is the one attached to it.
+            // First sighting wins.
+            //
+            // True within one browser, where the keywords are walked in
+            // weight order. NOT true across shards: each keyword now gets its
+            // own browser and they merge in whatever order they finish, so a
+            // venue found by two searches is typed by whichever raced home
+            // first. Pin Chasers, a Tampa bowling alley, came back as `Video
+            // arcade` because the arcade shard beat the bowling one — see the
+            // README on where a labelling pass would earn its place.
             if (!out.has(c.id)) out.set(c.id, c)
           }
         } catch (err) {

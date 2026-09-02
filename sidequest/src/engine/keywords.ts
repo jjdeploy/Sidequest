@@ -305,6 +305,52 @@ function normalizeVibe(v: string): string[] {
 }
 
 /**
+ * Did the vocabulary recognise any part of what they asked for?
+ *
+ * `false` means at least one term came from the request; `true` means every
+ * term came from the floor, which is the "I am new here and bored" sweep and
+ * is what you get when nothing matched.
+ *
+ * "skiing at night" in Tampa came back as a full, cheerful weekend that said
+ * nothing at all. Tampa having no skiing is fine — leaving no trace of the
+ * request anywhere in the output is not, because the reader cannot tell the
+ * difference between "we looked and there is none" and "we ignored you".
+ *
+ * Asked of the whole set rather than per-term because a mood the vocabulary
+ * DOES know produces no typed term either: "chill" becomes coffee shops and
+ * parks, and none of those is a word the user wrote.
+ */
+export function understoodNothing(keywords: Keyword[]): boolean {
+  return keywords.every((k) => k.weight < ASKED_FOR)
+}
+
+/**
+ * What the 21+ switch cost them, in the words they used.
+ *
+ * `add` refuses to spend a browser on a room the party cannot enter, which
+ * is right — the gate would throw those results away anyway. But it also
+ * meant a typed request for a club never became a term, so it never became a
+ * requirement, so nothing was owed and the plan came back with no club and
+ * no reason given. Silently dropping the thing somebody asked for by name is
+ * the exact failure `unmet` exists to prevent.
+ *
+ * Answered by building the set twice and diffing, rather than by threading a
+ * second return value through every caller: what the flag cost is precisely
+ * the difference between the two, and asking the question that way means it
+ * cannot drift out of step with the rule that does the refusing.
+ *
+ * Only ever reports terms they typed the word for. A mood chip is not a
+ * request for a club — "live music" reaches the nightlife vocabulary
+ * internally, and those terms are dropped quietly and correctly.
+ */
+export function blockedByAgeGate(req: PlanRequest, limit = 8): Keyword[] {
+  if (partyIsOver21(req)) return []
+  const allowed = new Set(buildKeywords(req, limit).map((k) => k.term))
+  const asIfAdult = buildKeywords({ ...req, party: { ...req.party, over21: true } }, limit)
+  return asIfAdult.filter((k) => k.said && !allowed.has(k.term))
+}
+
+/**
  * Build the query set for a request.
  *
  * Returns at most `limit` keywords, highest weight first, deduped by term.

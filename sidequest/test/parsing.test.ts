@@ -63,12 +63,35 @@ describe("guessCategory: things that must keep working", () => {
     ["Cigar City Brewing taproom", "drink"],
     ["Jazz at the Palladium", "music"],
     ["Gasparilla Festival", "event"],
-    // An unanchored "eat" filed this under food.
-    ["Great Escape Room", "other"],
+    // An unanchored "eat" filed this under food. It reads as `active` now
+    // that escape rooms are in the vocabulary, which is what it always
+    // should have been — the point being defended here is that it is not
+    // food.
+    ["Great Escape Room", "active"],
   ]
   for (const [title, want] of cases) {
     test(`${title} -> ${want}`, () => assert.equal(guessCategory(title), want))
   }
+})
+
+describe("guessCategory: the things people actually go and do", () => {
+  test("bowling is a category the planner searches for and could not name", () => {
+    // categoryFromMapsType knew about bowling; guessCategory never did. So a
+    // bowling listing from any source that publishes no type descriptor —
+    // Groupon, in the run that caught this — came back as `other`, which
+    // cost it the evening slot that had been booked for bowling.
+    assert.equal(guessCategory("Electrifying Bowlero Bowling Fun, Shoes Included"), "active")
+    assert.equal(guessCategory("Sunset Lanes Bowling Center"), "active")
+    assert.equal(guessCategory("Saturn 5 Arcade"), "active")
+    assert.equal(guessCategory("Breakout Escape Room"), "active")
+    assert.equal(guessCategory("Stone Axe Throwing"), "active")
+  })
+
+  test("...without matching the words hiding inside other words", () => {
+    assert.notEqual(guessCategory("Lowry Parcade"), "active")
+    assert.notEqual(guessCategory("Poke Bowl Kitchen"), "active")
+    assert.notEqual(guessCategory("Super Bowl Watch Party"), "active")
+  })
 })
 
 describe("guessCategory: a club is not necessarily that kind of club", () => {

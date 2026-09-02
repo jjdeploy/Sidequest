@@ -117,7 +117,12 @@ export function guessCategory(text: string, fallback: Category = "other"): Categ
     [/\b(night ?clubs?|dance clubs?|strip clubs?|nightlife|dancing?|dj|discos?)\b/, "nightlife"],
     [/\b(concerts?|live music|bands?|music venue|jazz|symphony|orchestra|amphitheat\w*|open mic)\b/, "music"],
     [/\b(parks?|trails?|gardens?|beach\w*|hikes?|hiking|nature|lakes?|rivers?|botanical?|waterfront|greenway|boardwalk)\b/, "outdoors"],
-    [/\b(kayak\w*|bikes?|biking|climbing|gyms?|surf\w*|skat\w+|paddle\w*|yoga|pilates|fitness|workout|bootcamp|run(?:ning)? club|golf|tennis)\b/, "active"],
+    // Bowling and arcades were missing outright, which mattered because the
+    // keyword floor searches for both. categoryFromMapsType knew about them,
+    // so a Maps result was fine and a Groupon one came back as `other` —
+    // and lost the evening slot that had been booked for bowling. "bowling"
+    // rather than "bowl" on purpose: a poke bowl is not an activity.
+    [/\b(kayak\w*|bikes?|biking|climbing|gyms?|surf\w*|skat\w+|paddle\w*|yoga|pilates|fitness|workout|bootcamp|run(?:ning)? club|golf|tennis|bowling|bowlero|arcades?|billiards|pool hall|laser tag|axe throwing|escape rooms?|go-?karts?)\b/, "active"],
     [/\b(zoos?|aquariums?|playgrounds?|children|kids|family|amusement|arcades?|petting farm)\b/, "family"],
     // Food is tested BEFORE shopping, and the order is the fix: these rules
     // are first-match-wins and "shop" is the most promiscuous token in the

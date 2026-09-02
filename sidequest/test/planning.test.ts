@@ -6,7 +6,7 @@
  */
 import { test, describe } from "node:test"
 import assert from "node:assert/strict"
-import { buildKeywords, requestedCategories, stripTimeWords, timeOfDayFrom } from "../src/engine/keywords.js"
+import { blockedByAgeGate, buildKeywords, requestedCategories, stripTimeWords, timeOfDayFrom, understoodNothing } from "../src/engine/keywords.js"
 import { buildItinerary } from "../src/engine/itinerary.js"
 import { rank } from "../src/engine/score.js"
 import { candidate, request, scored, WEEKEND } from "./helpers.js"
@@ -102,6 +102,20 @@ describe("rank: merging sightings of one venue", () => {
     )
     assert.equal(merged!.candidate.rating, 4.5)
     assert.equal(merged!.candidate.reviewCount, 5606)
+  })
+
+  test("a sighting without a descriptor does not erase one that has it", () => {
+    // Only Maps publishes a descriptor, and whichever sighting arrived first
+    // won every field it did not name — so a TripAdvisor row landing ahead of
+    // the Maps one deleted the single most reliable fact on the candidate.
+    const [merged] = rank(
+      [
+        candidate({ id: "same", title: "Pin Chasers", source: "tripadvisor" }),
+        candidate({ id: "same", title: "Pin Chasers", source: "google-maps", kind: "Bowling alley" }),
+      ],
+      ctx,
+    )
+    assert.equal(merged!.candidate.kind, "Bowling alley")
   })
 
   test("three sightings collapse to one candidate", () => {
@@ -750,5 +764,53 @@ describe("what you typed is a requirement, not a preference", () => {
     const it = buildItinerary([lanes, club], request({ days: [WEEKEND[0]!] }), [], new Set(), "evening", one)
     assert.equal(it.unmet.length, 1, JSON.stringify(it.unmet))
     assert.match(it.unmet[0]!, /evening/i)
+  })
+})
+
+describe("the 21+ switch has to say what it cost you", () => {
+  const ask = stripTimeWords("bowling at night, club at night")
+
+  test("a club request is reported, not silently dropped", () => {
+    // The keyword builder refuses to spend a browser on a room the party
+    // cannot enter, which is right — but it also meant the request never
+    // became a requirement, so nothing was owed and `unmet` came back empty.
+    // The user asked for a club by name and got a weekend with no club and
+    // no reason given, which is the exact failure `unmet` exists to prevent.
+    const lost = blockedByAgeGate(request({ vibes: [ask] })).map((k) => k.term)
+    assert.deepEqual(lost, ["dance clubs"])
+  })
+
+  test("nothing is owed once the box is ticked", () => {
+    const req = request({ vibes: [ask], party: { adults: 2, kids: 0, over21: true } })
+    assert.deepEqual(blockedByAgeGate(req), [])
+  })
+
+  test("and nothing is owed to someone who never asked", () => {
+    // A mood chip is not a request for a club. "live music" maps onto the
+    // nightlife vocabulary internally, and those terms are dropped quietly
+    // and correctly — no explanation is owed for a word nobody typed.
+    assert.deepEqual(blockedByAgeGate(request({ vibes: ["nightlife"] })), [])
+    assert.deepEqual(blockedByAgeGate(request({ vibes: ["outdoorsy"] })), [])
+  })
+})
+
+describe("a request the vocabulary has never heard of", () => {
+  test("\"skiing at night\" in Tampa is recognised as not recognised", () => {
+    // Tampa has no skiing, which is fine. What is not fine is that the run
+    // came back with a full, cheerful weekend and said nothing at all — the
+    // word matched no vibe, so the floor quietly took over and the request
+    // left no trace anywhere in the output.
+    const kw = buildKeywords(request({ vibes: [stripTimeWords("skiing at night")] }), 8)
+    assert.equal(understoodNothing(kw), true)
+  })
+
+  test("...but a mood it does know is not a failure to understand", () => {
+    // "chill" produces no term the user typed the word for either, and must
+    // not be reported as unrecognised. The difference is whether the vibe
+    // vocabulary matched at all.
+    for (const vibe of ["chill", "outdoorsy", "cheap", "date night"]) {
+      const kw = buildKeywords(request({ vibes: [vibe] }), 8)
+      assert.equal(understoodNothing(kw), false, vibe)
+    }
   })
 })
