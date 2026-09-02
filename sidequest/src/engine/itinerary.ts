@@ -242,16 +242,23 @@ export function buildItinerary(
         continue
       }
 
-      // The word first, the category second. "bowling" and a pinball museum
+      // The name first, the category second. "bowling" and a pinball museum
       // are both `active`, and only one of them is bowling — a reservation
       // made for a word should be spent on something that answers it.
+      //
+      // The NAME, and not the evidence. Reading the whole listing booked
+      // Biltmore Estate as the Sunday evening bowling: the house has a
+      // two-lane alley in the basement, so the word is genuinely in the
+      // blurb. It is the same rule engine/age.ts runs on and for the same
+      // reason — what a listing is called is a claim about what it is, and
+      // what its description mentions in passing is not.
       let best: { s: Scored; rank: number } | null = null
       for (const s of ranked) {
         if (used.has(s.candidate.id)) continue
         const c = s.candidate
         if (!fitsSlot(c, spot.date, spot.slot)) continue
         if (costOf(s) > remainingBudget) continue
-        const byName = mentions(want.term, `${c.title} ${c.evidence}`)
+        const byName = mentions(want.term, c.title)
         if (!byName && c.category !== want.category) continue
         const rank = (byName ? 1000 : 0) + s.score
         if (!best || rank > best.rank) best = { s, rank }

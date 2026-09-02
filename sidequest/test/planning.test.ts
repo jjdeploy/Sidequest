@@ -650,6 +650,35 @@ describe("what you typed is a requirement, not a preference", () => {
     assert.equal(it.days[0]!.items.find((i) => i.slot === "Evening")?.scored.candidate.id, "lanes")
   })
 
+  test("a blurb that mentions bowling is not a bowling alley", () => {
+    // Biltmore Estate was booked as the Sunday evening bowling. The house
+    // has a two-lane alley in the basement, so the word is in the listing —
+    // and the booking pass was reading the whole listing. The name is
+    // evidence; a blurb is not. Same rule the 21+ gate already runs on, for
+    // the same reason.
+    const biltmore = scored(candidate({
+      id: "biltmore", title: "Biltmore Estate", category: "culture",
+      evidence: "…a two-lane bowling alley in the basement, a pool…",
+    }), 40)
+    const lanes = scored(candidate({ id: "lanes", title: "Sky Lanes Bowling", category: "active" }), 3)
+    const it = buildItinerary([biltmore, lanes], request({ days: [WEEKEND[0]!] }), [], new Set(), "evening",
+      [{ term: "bowling", category: "active" }])
+    assert.equal(it.days[0]!.items.find((i) => i.slot === "Evening")?.scored.candidate.id, "lanes")
+  })
+
+  test("...and it does not outrank a plain category match either", () => {
+    // With no alley in town, the nearest `active` thing is closer to the
+    // request than a stately home whose blurb happens to say the word.
+    const biltmore = scored(candidate({
+      id: "biltmore", title: "Biltmore Estate", category: "culture",
+      evidence: "…a two-lane bowling alley in the basement…",
+    }), 40)
+    const pinball = scored(candidate({ id: "pin", title: "Asheville Pinball Museum", category: "active" }), 3)
+    const it = buildItinerary([biltmore, pinball], request({ days: [WEEKEND[0]!] }), [], new Set(), "evening",
+      [{ term: "bowling", category: "active" }])
+    assert.equal(it.days[0]!.items.find((i) => i.slot === "Evening")?.scored.candidate.id, "pin")
+  })
+
   test("...and the category carries it when nothing matches the word", () => {
     const pinball = scored(candidate({ id: "pin", title: "Asheville Pinball Museum", category: "active" }), 4)
     const dinner = scored(candidate({ id: "food", title: "Curate", category: "food" }), 40)
