@@ -335,74 +335,147 @@ fn glow(d: f32, r: f32, soft: f32) -> f32 {
 const NOOP = { ok: false, set() {}, stop() {} }
 
 let vgpu = null
+let device = null
+let clock = null
+/** Every live canvas. One loop draws all of them. */
+const mounted = new Set()
+
 /**
- * Load vgpu once, and only when something actually asks to draw.
+ * The one GPU context, and the one frame loop over it.
  *
- * A dynamic import so a browser without WebGPU never fetches 47 modules it
- * cannot use, and so a failure here is a caught rejection rather than a script
- * error that takes the rest of app.js down with it.
+ * Three canvases, one device. The first version called init() per canvas,
+ * which is against the grain of the library — "a program has one Gpu
+ * context" — and gave the hero graphic a device whose frames nothing ever
+ * submitted, so it rendered as a black rectangle: the canvas element sized
+ * correctly, with no colour attachment ever presented to it.
+ *
+ * One clock, too, so the background and the graphic never drift apart.
  */
-async function load() {
+async function context() {
   if (!navigator.gpu) return null
-  if (!vgpu) {
-    try {
-      vgpu = await import("/vendor/vgpu/index.js")
-    } catch (err) {
-      console.warn("[sidequest] vgpu did not load; keeping the CSS background", err)
-      return null
-    }
+  if (device) return device
+  try {
+    vgpu = vgpu ?? (await import("/vendor/vgpu/index.js"))
+    device = await vgpu.init()
+    clock = vgpu.clock(device)
+  } catch (err) {
+    console.warn("[sidequest] no WebGPU; keeping the CSS background", err)
+    device = null
   }
-  return vgpu
+  return device
+}
+
+/**
+ * Start drawing, once there is something to draw.
+ *
+ * Deliberately not started alongside the device: a frame that submits no
+ * passes is a frame doing nothing at best, and the loop would be running
+ * before the first canvas had registered.
+ */
+let looping = false
+function startLoop() {
+  if (looping) return
+  looping = true
+  vgpu.frameLoop(device, (frame) => {
+    for (const m of mounted) {
+      m.shader.set({ params: { time: clock.time } })
+      frame.pass(m.view, m.shader)
+    }
+  })
+}
+
+/**
+ * Wait until the canvas has been laid out.
+ *
+ * Mounting runs at boot, which can be before the first layout — and a
+ * surface built against a zero-width canvas draws nothing forever, because
+ * `onResize` never fires for an element that was already its final size by
+ * the time anyone looked. Two frames is enough in practice; the cap is there
+ * so a canvas that is display:none (the hero graphic, on a narrow window)
+ * gives up instead of spinning for the life of the page.
+ */
+async function sized(canvas, tries = 90) {
+  for (let i = 0; i < tries; i++) {
+    if (canvas.clientWidth > 0 && canvas.clientHeight > 0) return true
+    await new Promise((r) => requestAnimationFrame(r))
+  }
+  return false
 }
 
 /**
  * Mount a shader on a canvas.
  *
  * Returns `{ ok, set, stop }` in every case, so callers never branch on
- * whether the GPU was there.
+ * whether the GPU was there. On success the canvas gets `.is-live`, which is
+ * what the stylesheet keys its own background off — a canvas that never draws
+ * must not be left showing a dark rectangle where a picture was promised.
  */
 async function mount(canvas, source, initial) {
-  const lib = await load()
-  if (!lib || !canvas) return NOOP
+  if (!canvas) return NOOP
+  const gpu = await context()
+  if (!gpu) return NOOP
+  if (!(await sized(canvas))) return NOOP
 
   try {
-    const gpu = await lib.init()
-    // dpr is capped at 2: this is a full-bleed background, and a 3x retina
-    // canvas costs three times the fragments to draw the same picture.
-    const view = lib.surface(gpu, canvas, { dpr: [1, 2] })
-    const uniforms = { ...initial, aspect: canvas.clientWidth / Math.max(1, canvas.clientHeight) }
-    const shader = lib.effect(gpu, source, { set: { params: uniforms } })
+    // dpr capped at 2: these are backgrounds, and a 3x retina canvas costs
+    // three times the fragments to draw the same picture.
+    const view = vgpu.surface(gpu, canvas, { dpr: [1, 2] })
+    const aspect = () => canvas.clientWidth / Math.max(1, canvas.clientHeight)
+    const uniforms = { ...initial, aspect: aspect() }
+    const shader = vgpu.effect(gpu, source, { set: { params: uniforms } })
 
-    view.onResize(() => {
-      uniforms.aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight)
-      shader.set({ params: { aspect: uniforms.aspect } })
-    })
+    view.onResize(() => shader.set({ params: { aspect: aspect() } }))
 
-    const time = lib.clock(gpu)
-    let live = true
-    lib.frameLoop(gpu, (frame) => {
-      if (!live) return false
-      shader.set({ params: { time: time.time } })
-      frame.pass(view, shader)
-    })
+    const entry = { view, shader }
+    mounted.add(entry)
+    startLoop()
+    canvas.classList.add("is-live")
 
     return {
       ok: true,
       set(next) {
-        if (!live) return
+        if (!mounted.has(entry)) return
         Object.assign(uniforms, next)
         shader.set({ params: next })
       },
       stop() {
-        live = false
-        try { gpu.dispose() } catch { /* already gone */ }
+        mounted.delete(entry)
+        canvas.classList.remove("is-live")
       },
     }
   } catch (err) {
-    console.warn("[sidequest] WebGPU init failed; keeping the CSS background", err)
+    console.warn("[sidequest] could not draw on", canvas.id, err)
     return NOOP
   }
 }
+
+/**
+ * What actually happened, for a console.
+ *
+ * Nothing in the app reads this. It exists because the failure mode of all
+ * of the above is "a rectangle where a picture should be", which tells you
+ * nothing about which of five things went wrong — whether WebGPU exists,
+ * whether the device was acquired, whether the canvas had been laid out,
+ * and which canvases are being drawn into right now.
+ */
+export function gpuReport() {
+  return {
+    webgpu: Boolean(navigator.gpu),
+    moduleLoaded: Boolean(vgpu),
+    device: Boolean(device),
+    looping,
+    drawing: mounted.size,
+    canvases: ["heroGpu", "heroArt", "waitGpu"].map((id) => {
+      const c = document.getElementById(id)
+      return c
+        ? `${id}: ${c.clientWidth}x${c.clientHeight}${c.classList.contains("is-live") ? " live" : " NOT live"}`
+        : `${id}: missing`
+    }),
+  }
+}
+
+// One line to paste into a console when something looks wrong.
+if (typeof window !== "undefined") window.sidequestGpu = gpuReport
 
 export function mountHero(canvas) {
   return mount(canvas, HERO_WGSL, { time: 0, fade: 1 })

@@ -170,3 +170,27 @@ describe("the hero graphic", () => {
     assert.ok(luma(all) > luma(none), `${luma(none).toFixed(1)} -> ${luma(all).toFixed(1)}: the ring is not lighting`)
   })
 })
+
+describe("one device, three shaders", () => {
+  test("all three live on a single context", async (t) => {
+    // The page draws three canvases. The first version gave each its own
+    // init(), which is against the grain of a library whose first line is
+    // "everything starts from one call" — and the hero graphic came out as a
+    // black rectangle. This is the architecture that replaced it: one
+    // device, three effects, all drawable.
+    if (!lib || !gpu) return t.skip("no WebGPU adapter on this machine")
+
+    const shaders = [HERO_WGSL, ART_WGSL, WAIT_WGSL].map((src) =>
+      lib!.effect(gpu!, src, {
+        set: { params: { time: 1, aspect: 1, fade: 1, lit: 1, sending: 4, count: 13, energy: 0.5 } },
+      }))
+
+    for (const shader of shaders) {
+      const t2 = lib!.target(gpu!, { size: [32, 32] })
+      shader.draw(t2)
+      const px = new Uint8Array(await t2.read())
+      // Anything at all, rather than an untouched target.
+      assert.ok(px.some((b, i) => i % 4 !== 3 && b !== 0), "a shader drew nothing")
+    }
+  })
+})
