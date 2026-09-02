@@ -97,22 +97,24 @@
 
                  Browser form history is keyed on the field name, so a named
                  input gets a dropdown of every city anyone has typed here —
-                 over the top of the datalist below, which is the list we
-                 actually curated. Chrome also reads `name="city"` as an
+                 over the top of whatever else was there. Chrome also reads
+                 `name="city"` as an
                  address field and offers saved addresses, and it ignores
                  autocomplete="off" when it does. Nothing needs the name:
                  the form never submits natively, app.js builds the query.
 
                  The data-* attributes are what 1Password and LastPass look
                  for; without them they inject their own icon into the bar. -->
-            <input id="city" list="cityList" placeholder="Tampa, FL" required
+            <!-- No `list`, and no `name`.
+
+                 A datalist of suggested cities was the last thing that could
+                 open a dropdown here: Chrome shows every option the moment
+                 the field is clicked, which is indistinguishable from the
+                 form history this field no longer keeps. A box you click
+                 into to type a city should do nothing but let you type. -->
+            <input id="city" placeholder="Tampa, FL" required
                    autocomplete="off" autocapitalize="words" spellcheck="false"
                    data-1p-ignore data-lpignore="true" data-form-type="other">
-            <datalist id="cityList">
-              <option value="Tampa, FL"><option value="Palm Coast, FL"><option value="Austin, TX">
-              <option value="Seattle, WA"><option value="Asheville, NC"><option value="Boise, ID">
-              <option value="New Orleans, LA"><option value="Portland, OR">
-            </datalist>
           </label>
 
           <span class="sb-div" aria-hidden="true"></span>
