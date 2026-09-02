@@ -77,6 +77,15 @@ export type PoolEvent =
   | { type: "gated"; source: SourceId; sessionId: string; ms: number }
   | { type: "note"; source: SourceId; msg: string }
   | { type: "done"; source: SourceId; found: number; ms: number }
+  /**
+   * What a unit actually came back with, the moment it came back.
+   *
+   * `done` says how many; this says which. Separate because the counts drive
+   * the gantt and the ring and are worth keeping small, while this is only
+   * ever for showing a reader that something is arriving — it is raw, it is
+   * pre-screening, and nothing downstream reads it.
+   */
+  | { type: "landed"; source: SourceId; titles: string[] }
   | { type: "retry"; source: SourceId; attempt: number; reason: string }
   | { type: "fail"; source: SourceId; reason: string }
 
@@ -256,6 +265,16 @@ export class BrowserPool {
     const started = Date.now()
     const partial = new Map<SourceId, SourceResult>()
     const record = (r: SourceResult) => {
+      // Announce the arrival before merging it, so the page can show a venue
+      // the instant a browser has read it rather than at the end of the
+      // twenty seconds. Capped: this is a ticker, not a transfer.
+      if (r.candidates.length > 0) {
+        this.emit({
+          type: "landed",
+          source: r.source,
+          titles: r.candidates.slice(0, 12).map((c) => c.title),
+        })
+      }
       const prior = partial.get(r.source)
       partial.set(
         r.source,

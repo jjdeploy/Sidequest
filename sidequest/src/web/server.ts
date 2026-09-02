@@ -33,6 +33,18 @@ import { Store } from "./../store/db.js"
 import type { Mobility } from "./../types.js"
 
 const PUBLIC_DIR = resolve(fileURLToPath(new URL("./public", import.meta.url)))
+
+/**
+ * vgpu, served straight out of node_modules.
+ *
+ * Its dist is 47 ESM files that import each other by relative path and
+ * nothing else — no bare specifiers — so a browser can load it as-is and this
+ * page keeps its no-build-step promise. The alternative was a CDN, and a
+ * dashboard that needs the network to draw its own background is worse than
+ * one that reads a folder.
+ */
+const VGPU_DIR = resolve(fileURLToPath(new URL("../../node_modules/vgpu/dist", import.meta.url)))
+const VGPU_PREFIX = "/vendor/vgpu/"
 const DB_PATH = process.env.SIDEQUEST_DB ?? resolve(process.cwd(), "data", "sidequest.db")
 const PORT = Number(process.env.PORT ?? 5173)
 
@@ -42,6 +54,8 @@ const MIME: Record<string, string> = {
   ".js": "text/javascript; charset=utf-8",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
+  ".wgsl": "text/plain; charset=utf-8",
+  ".map": "application/json",
 }
 
 // One store for the life of the process. The CLI opens its own connection to
@@ -83,13 +97,18 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
 }
 
 async function serveStatic(res: ServerResponse, pathname: string): Promise<void> {
-  const rel = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "")
-  const full = resolve(PUBLIC_DIR, rel)
+  // Two roots, the same containment rule for both.
+  const vendored = pathname.startsWith(VGPU_PREFIX)
+  const root = vendored ? VGPU_DIR : PUBLIC_DIR
+  const rel = vendored
+    ? pathname.slice(VGPU_PREFIX.length)
+    : pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "")
+  const full = resolve(root, rel)
   // Contain the resolved path inside the public directory. `..` in a URL is
   // normally collapsed by the client, but nothing guarantees the client is a
   // browser, and serving arbitrary files from a process holding an API key is
   // not a mistake worth risking on politeness.
-  if (full !== PUBLIC_DIR && !full.startsWith(PUBLIC_DIR + sep)) {
+  if (full !== root && !full.startsWith(root + sep)) {
     json(res, 403, { error: "forbidden" })
     return
   }

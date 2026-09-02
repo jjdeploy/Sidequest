@@ -142,6 +142,20 @@ body[data-screen="landing"] .screen--landing { display: flex; }
   overflow: hidden;
 }
 
+/* The GPU background, and the CSS one it replaces.
+
+   Both are painted; only one is visible. `body.has-gpu` is set by gpu.js
+   after a device actually exists, which is the only moment we know the
+   canvas will have something in it — checking `navigator.gpu` is not enough,
+   because init() still rejects on a machine with no adapter. */
+.gpu-bg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  z-index: 0; pointer-events: none; display: block; opacity: 0;
+  transition: opacity .9s ease-out;
+}
+body.has-gpu .gpu-bg { opacity: 1; }
+body.has-gpu .aurora { display: none; }
+
 .aurora { position: absolute; inset: -25% -20% 0; z-index: 0; pointer-events: none; filter: blur(80px); }
 .aurora span { position: absolute; display: block; border-radius: 50%; opacity: .3; will-change: transform; }
 /* Weighted right. All the reading happens on the left, and colour behind body
@@ -170,8 +184,30 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 .hero {
   position: relative; z-index: 1;
   padding: var(--s8) 0 var(--s7); max-width: 1240px; width: 100%; margin: 0 auto;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s7);
+  align-items: center;
 }
 .hero-copy { min-width: 0; max-width: 660px; }
+
+/* The graphic only appears when there is room for it beside the copy.
+   Below that the search bar is the whole point of the screen and a picture
+   above it is a thing to scroll past. */
+.hero-art { display: none; margin: 0; min-width: 0; }
+@media (min-width: 1040px) {
+  .hero { grid-template-columns: minmax(0, 1fr) minmax(360px, 460px); }
+  .hero-art { display: block; }
+}
+.hero-art canvas {
+  display: block; width: 100%; aspect-ratio: 4 / 3;
+  border-radius: var(--r-lg); background: #0e0a08;
+  box-shadow: 0 24px 60px -24px rgba(60,25,10,.55), 0 2px 6px rgba(60,25,10,.10);
+  animation: riseIn .7s cubic-bezier(.2,.8,.25,1) .3s backwards;
+}
+.hero-art figcaption {
+  display: flex; align-items: baseline; gap: var(--s2);
+  margin-top: var(--s3); font: 400 12px var(--mono); color: var(--faint);
+}
+.hero-art figcaption b { color: var(--ink); font-weight: 600; }
 
 .badge {
   display: inline-flex; align-items: center; gap: var(--s2); align-self: flex-start;
@@ -371,7 +407,10 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 
 /* ═══════════════════════════════════════════════════════════════ working */
 
-.screen--working { min-height: calc(100dvh - var(--topbar)); }
+.screen--working { min-height: calc(100dvh - var(--topbar)); position: relative; }
+/* Above the canvas, and on its own layer so the shader repainting every
+   frame never triggers a repaint of the text sitting on top of it. */
+.working-body { position: relative; z-index: 1; }
 .working-body { padding: var(--s6) var(--gutter) var(--s7); max-width: 720px; width: 100%; }
 
 /* One line, labelled. This used to be three stacked lines with the place name
@@ -423,6 +462,30 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 }
 
 /* One pip per source, in the order they were launched. */
+/* The live feed of what the browsers are reading.
+
+   Masked at the bottom rather than scrolled: it is peripheral, and a list
+   that visibly ends invites you to read to the end of it instead of
+   watching the middle. */
+.feed {
+  display: flex; flex-direction: column; gap: 2px;
+  height: 148px; overflow: hidden; margin: var(--s4) auto var(--s2);
+  max-width: 460px; width: 100%;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0 62%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0 62%, transparent 100%);
+}
+.feed-row {
+  display: flex; align-items: baseline; gap: var(--s3);
+  font: 400 12px var(--mono); color: var(--muted);
+  padding: 3px 0; white-space: nowrap;
+  animation: feed-in .4s cubic-bezier(.2, .9, .3, 1) backwards;
+}
+.feed-src { flex: none; width: 88px; text-align: right; color: var(--faint); }
+.feed-title { overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+@keyframes feed-in { from { opacity: 0; transform: translateY(-6px); } }
+/* Someone who asked for less motion gets the list without the slide. */
+@media (prefers-reduced-motion: reduce) { .feed-row { animation: none; } }
+
 .pips {
   display: flex; flex-wrap: wrap; justify-content: center;
   gap: var(--s2); margin-bottom: var(--s4);

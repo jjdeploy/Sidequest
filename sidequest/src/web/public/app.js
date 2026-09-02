@@ -175,6 +175,13 @@ function closeWhen() {
   $("whenBtn").setAttribute("aria-expanded", "false")
 }
 
+// ─────────────────────────────────────────────────────────────────── gpu
+
+// Optional, always. See gpu.js — every one of these returns a handle whose
+// methods do nothing when WebGPU is unavailable, so nothing below branches
+// on whether it worked.
+import { mountArt, mountHero, mountWait } from "/gpu.js"
+
 // ───────────────────────────────────────────────────────────────── state
 
 const state = {
@@ -198,6 +205,9 @@ const state = {
   ratings: new Map(),
   explain: false,
   stream: null,
+  heroGpu: null,
+  artGpu: null,
+  waitGpu: null,
   place: null,
   gathered: null,
   screened: null,
@@ -230,6 +240,31 @@ async function boot() {
   buildMoods()
   buildWeekends()
   wire()
+
+  // Not awaited. The shader is decoration on a page whose search box has to
+  // work the instant it renders, and vgpu is 47 modules and a device request.
+  mountHero($("heroGpu")).then((gpu) => {
+    state.heroGpu = gpu
+    // Only once a device really exists. `navigator.gpu` being present is not
+    // the same as init() succeeding, and swapping the CSS out on the promise
+    // of a background rather than the fact of one leaves a blank rectangle.
+    if (gpu.ok) document.body.classList.add("has-gpu")
+  })
+
+  // The hero graphic lights its thirteen points over the first few seconds,
+  // which is the same beat the real fan-out has. Nothing drives it — it is a
+  // picture of the thing, not a readout of it.
+  mountArt($("heroArt")).then((gpu) => {
+    state.artGpu = gpu
+    if (!gpu.ok) return
+    const started = performance.now()
+    const tick = () => {
+      const lit = Math.min(1, (performance.now() - started) / 4200)
+      gpu.set({ lit })
+      if (lit < 1) requestAnimationFrame(tick)
+    }
+    tick()
+  })
   try {
     const s = await (await fetch("/api/state")).json()
     state.weights = s.weights
@@ -345,7 +380,7 @@ function start() {
   state.span = 20_000
   state.catalogue = []; state.planned.clear(); state.expanded.clear(); state.filter = "all"
   state.gathered = null; state.screened = null
-  clear($("lanes")); clear($("terms")); clear($("pips"))
+  clear($("lanes")); clear($("terms")); clear($("pips")); clear($("feed"))
   $("foundCount").textContent = "0"
   $("foundLabel").textContent = "standing by"
   $("ringFill").classList.add("ring--idle")
@@ -360,6 +395,11 @@ function start() {
   $("readyTotal").textContent = "–"
   renderHere(null)
   screen("working")
+
+  // Mounted on the first run and kept for the session: the canvas has no
+  // size until its screen is displayed, and a surface built against a
+  // zero-width canvas is a device acquired for nothing.
+  if (!state.waitGpu) mountWait($("waitGpu")).then((gpu) => { state.waitGpu = gpu })
 
   const stream = new EventSource(`/api/plan?${q}`)
   state.stream = stream
@@ -489,6 +529,11 @@ function onPool(at, ev) {
       lane.endAt = at
       if (!lane.found) lane.status = "failed"
       break
+    case "landed":
+      // Raw arrivals, straight onto the screen. Everything else here is a
+      // number going up; this is the only part that shows the thing itself.
+      streamIn(ev.source, ev.titles)
+      return
     default:
       return
   }
@@ -496,6 +541,37 @@ function onPool(at, ev) {
   $("readyCount").textContent = String(gated)
   drawRing()
   draw()
+}
+
+/**
+ * Venues, as they arrive.
+ *
+ * Twenty seconds is a long time to watch a counter. These are unscreened —
+ * some of them will be rejected as out of town, on the wrong date, or an
+ * errand — so they are labelled as what a browser is reading rather than as
+ * anything recommended. The honest version of a progress bar: not "37%", but
+ * the actual page text arriving from thirteen cities at once.
+ *
+ * Newest first, capped, and each row is dropped in on a stagger so a source
+ * returning ten at once still reads as ten separate arrivals.
+ */
+const FEED_MAX = 28
+
+function streamIn(source, titles) {
+  const feed = $("feed")
+  if (!feed) return
+  titles.forEach((title, i) => {
+    // 45ms apart: fast enough to feel like a burst, slow enough to read.
+    setTimeout(() => {
+      if (!state.running) return
+      const row = el("div", { class: "feed-row" }, [
+        el("span", { class: "feed-src" }, SOURCE_NAME[source] ?? source),
+        el("span", { class: "feed-title" }, title),
+      ])
+      feed.prepend(row)
+      while (feed.children.length > FEED_MAX) feed.lastChild.remove()
+    }, i * 45)
+  })
 }
 
 /** 2πr for the r=52 circle in the markup. */
@@ -532,6 +608,17 @@ function drawRing() {
       : lane.gated > 0 ? "✓"
       : ""
   }
+
+  // The shader behind all this is driven by the same three numbers, so the
+  // lights and the ring can never disagree about what has happened.
+  state.waitGpu?.set({
+    lit: gated,
+    sending: lanes.filter((l) => l.found !== null).length,
+    count: Math.max(lanes.length, 1),
+    // Saturates around a hundred: past that the core is as bright as it
+    // gets and the number in the middle carries the rest.
+    energy: Math.min(1, found / 100),
+  })
 
   const progress = lanes.length === 0 ? 0
     : lanes.reduce((n, l) => n + (l.endAt !== null ? 1 : l.gated > 0 ? 0.34 : 0), 0) / lanes.length

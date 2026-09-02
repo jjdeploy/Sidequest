@@ -9,3 +9,6 @@ screenshot.png
 
 # The learning store and everything scraped into it.
 data/
+
+# Shader previews, rendered on demand by the headless renderer.
+sidequest/docs/preview-*.png

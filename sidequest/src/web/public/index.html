@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/app.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='15' fill='%23f4552c'/><path d='M11 26 V19 C11 14 14 12 20 11.6' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round'/><path d='M16.6 7.6 L21.4 11.5 L16.6 15.6' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='15' fill='%23f4552c'/><path d='M16 7 V17.4' stroke='%23fff' stroke-width='3.8' stroke-linecap='round'/><circle cx='16' cy='23.2' r='2.2' fill='%23fff'/></svg>">
 </head>
 <body data-screen="landing">
 
@@ -25,10 +25,12 @@
         </linearGradient>
       </defs>
       <circle cx="16" cy="16" r="15" fill="url(#bm)"/>
-      <!-- The road you were on, faint, and the turn off it. -->
-      <path d="M11 26 V6" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".38"/>
-      <path d="M11 20 C11 14.6 14.4 12.2 20.2 11.8" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round"/>
-      <path d="M16.8 8 L21.2 11.7 L16.9 15.4" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- The quest marker. The thing above an NPC's head that means: there
+           is something here, and it is optional, and you should go. Rounded
+           stem and a round dot so it reads as an offer rather than a warning,
+           and it is the one mark on the sheet still legible at 16px. -->
+      <path d="M16 7.4 V17.2" stroke="#fff" stroke-width="3.3" stroke-linecap="round"/>
+      <circle cx="16" cy="23" r="2" fill="#fff"/>
     </svg>
     <span class="brand-name">Sidequest</span>
   </button>
@@ -42,6 +44,10 @@
 
 <!-- ══════════════════════════════════════════════════════════════ landing -->
 <section class="screen screen--landing" id="landing">
+  <!-- Two backgrounds, one of which is used. The CSS blobs are the floor;
+       gpu.js hides them and takes over only once WebGPU has actually
+       initialised, so a browser without it never sees a blank rectangle. -->
+  <canvas class="gpu-bg" id="heroGpu" aria-hidden="true"></canvas>
   <div class="aurora" aria-hidden="true">
     <span class="aurora-a"></span><span class="aurora-b"></span>
     <span class="aurora-c"></span><span class="aurora-d"></span>
@@ -125,6 +131,18 @@
       </form>
     </div>
 
+    <!-- The one dark surface in the product, because the thing being sold is
+         a Friday evening. Thirteen lights circling a town seen from above:
+         the fan-out, as a picture. Hidden below 1040px, where the column it
+         sits beside has already taken the width. -->
+    <figure class="hero-art">
+      <canvas id="heroArt" aria-hidden="true"></canvas>
+      <figcaption>
+        <b>13 browsers</b>
+        <span>one town, read all at once</span>
+      </figcaption>
+    </figure>
+
   </div>
 
   <!-- What it reads and why that matters are the same argument, so they are
@@ -168,6 +186,7 @@
 
 <!-- ══════════════════════════════════════════════════════════════ working -->
 <section class="screen screen--working" id="working">
+  <canvas class="gpu-bg" id="waitGpu" aria-hidden="true"></canvas>
   <div class="working-body">
     <!-- One ring that fills as the sources come back, and the running count
          of what they found in the middle. -->
@@ -195,6 +214,9 @@
     </p>
 
     <div class="pips" id="pips"></div>
+    <!-- What each browser is reading, as it reads it. Unscreened on purpose:
+         this is the fan-out made visible, not a list of recommendations. -->
+    <div class="feed" id="feed" aria-live="polite" aria-label="Places being read right now"></div>
     <div class="terms" id="terms"></div>
     <p class="hint">Nothing searches until the page it opened confirms where it is.</p>
 
