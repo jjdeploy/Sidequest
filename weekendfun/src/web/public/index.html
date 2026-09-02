@@ -54,20 +54,19 @@
       </span>
 
       <h1 class="hero-line">
-        <span>It's the weekend</span>
-        <span>and you don't know</span>
-        <span>this town yet.</span>
+        <span>You're bored.</span>
+        <span>This town isn't.</span>
       </h1>
 
       <p class="hero-sub">
-        What's on near you is scattered across a dozen sites and none of them
-        will sell you an API. So we open real browsers in your city — actually
-        in it, at your coordinates — and read all of them at once.
+        Twelve sites know what's on this weekend and none of them talk to each
+        other. We read all of them at once, from a browser standing in your
+        city. Takes about twenty seconds.
       </p>
 
       <form class="ask" id="planForm" autocomplete="off">
-        <label class="field">
-          <span class="field-label">Your town</span>
+        <div class="field">
+          <span class="field-label">Where</span>
           <input id="city" name="city" list="cityList" placeholder="Tampa, FL" required
                  autocapitalize="words" spellcheck="false">
           <datalist id="cityList">
@@ -75,25 +74,24 @@
             <option value="Seattle, WA"><option value="Asheville, NC"><option value="Boise, ID">
             <option value="New Orleans, LA"><option value="Portland, OR">
           </datalist>
-        </label>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Which weekend</span>
+          <div class="weekends" id="weekends"></div>
+        </div>
 
         <label class="field">
           <span class="field-label">
             What are you after?
             <em id="askHint">optional</em>
           </span>
-          <input id="ask" name="ask" placeholder="date night, no driving, under $100">
+          <input id="ask" name="ask" placeholder="bowling at night, under $80">
         </label>
 
-        <div class="field">
-          <span class="field-label">Or just pick a mood</span>
-          <div class="chips" id="moodChips"></div>
-        </div>
+        <div class="chips" id="moodChips"></div>
 
-        <button class="go" id="go" type="submit">
-          Find my weekend
-          <span class="go-sub" id="goSub">about 20 seconds</span>
-        </button>
+        <button class="go" id="go" type="submit">Find my weekend</button>
         <p class="ask-error" id="formError" hidden></p>
       </form>
     </div>

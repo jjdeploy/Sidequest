@@ -1,6 +1,6 @@
 # Bearings
 
-**Get your bearings in a town you don't know yet.**
+**You're bored. This town isn't.**
 
 *It's the weekend, you're new here, and you have no idea what's on.*
 

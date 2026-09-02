@@ -81,16 +81,79 @@ const CATEGORY_LABEL = {
  * with no shape is the entire cold-start problem.
  */
 const MOODS = [
-  ["eat something good", "foodie"],
+  ["eat well", "foodie"],
   ["get outside", "outdoorsy"],
   ["live music", "nightlife"],
-  ["something to actually do", "active"],
+  ["something to do", "active"],
   ["with the kids", "family"],
-  ["museums and history", "cultural"],
   ["keep it cheap", "cheap"],
-  ["stay indoors", "indoors"],
-  ["a chill one", "chill"],
 ]
+
+/**
+ * The next few weekends, as local Y-M-D pairs.
+ *
+ * Built from integer date parts rather than `toISOString`, which converts to
+ * UTC first and shifts the answer by a day — the same trap the server-side
+ * date arithmetic documents. Somebody in Florida picking "this weekend"
+ * should not get Sunday and Monday.
+ */
+function upcomingWeekends(count = 4) {
+  const iso = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+
+  const today = new Date()
+  const base = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const dow = base.getDay()
+  // Saturday or Sunday already? That's this weekend, not next week's.
+  const toSaturday = dow === 6 ? 0 : dow === 0 ? -1 : 6 - dow
+
+  return Array.from({ length: count }, (_, i) => {
+    const sat = new Date(base)
+    sat.setDate(base.getDate() + toSaturday + i * 7)
+    const sun = new Date(sat)
+    sun.setDate(sat.getDate() + 1)
+    return {
+      days: [iso(sat), iso(sun)],
+      month: sat.toLocaleDateString(undefined, { month: "short" }),
+      sat: sat.getDate(),
+      sun: sun.getDate(),
+      // The month rolls over inside some weekends.
+      sunMonth: sun.getMonth() === sat.getMonth() ? null : sun.toLocaleDateString(undefined, { month: "short" }),
+      label: i === 0 ? "This weekend" : i === 1 ? "Next weekend" : null,
+    }
+  })
+}
+
+function buildWeekends() {
+  const host = $("weekends")
+  clear(host)
+  state.weekends = upcomingWeekends(4)
+  state.weekendIndex = 0
+
+  state.weekends.forEach((w, i) => {
+    const spoken = `${w.label ?? "Weekend"}, ${w.month} ${w.sat} to ${w.sunMonth ?? w.month} ${w.sun}`
+    host.append(el("button", {
+      type: "button", class: "weekend", "aria-pressed": String(i === 0),
+      // The visible label is three separate spans, which leaves the button
+      // with no accessible name at all.
+      "aria-label": spoken,
+      onclick: () => {
+        state.weekendIndex = i
+        for (const [j, node] of [...host.children].entries()) {
+          node.setAttribute("aria-pressed", String(j === i))
+        }
+      },
+    }, [
+      el("span", { class: "weekend-month" }, w.month),
+      el("span", { class: "weekend-days" }, [
+        String(w.sat),
+        el("i", {}, "–"),
+        w.sunMonth ? `${w.sunMonth} ${w.sun}` : String(w.sun),
+      ]),
+      el("span", { class: "weekend-label" }, w.label ?? "Sat & Sun"),
+    ]))
+  })
+}
 
 // ───────────────────────────────────────────────────────────────── state
 
@@ -102,6 +165,8 @@ const state = {
   span: 20_000,
   recording: false,
   moods: new Set(),
+  weekends: [],
+  weekendIndex: 0,
   itinerary: null,
   catalogue: [],
   planned: new Set(),
@@ -142,6 +207,7 @@ function renderHere(place) {
 
 async function boot() {
   buildMoods()
+  buildWeekends()
   wire()
   try {
     const s = await (await fetch("/api/state")).json()
@@ -221,6 +287,8 @@ function start() {
   const q = new URLSearchParams({
     city, vibes: [...state.moods].join(","), budget: "300", record: "1",
   })
+  const weekend = state.weekends[state.weekendIndex]
+  if (weekend) q.set("days", weekend.days.join(","))
   // Free text layers ON TOP of the chips rather than replacing them — asking
   // for "date night" and also ticking "keep it cheap" should give you both.
   const ask = $("ask").value.trim()

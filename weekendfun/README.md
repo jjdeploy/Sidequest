@@ -1,6 +1,6 @@
 # Bearings
 
-**It's the weekend and you don't know this town yet.**
+**You're bored. This town isn't.**
 
 What's on near you is split across a dozen sites and not one of them will sell
 you an API. Every attempt to unify local listings has died on exactly that —
