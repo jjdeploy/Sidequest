@@ -169,3 +169,44 @@ describe("the summary is what makes the gaps visible", () => {
     assert.equal(summary.admitted + summary.rejected, 1)
   })
 })
+
+describe("age: the 21+ flag is a gate, not a preference", () => {
+  const adultCtx = { place: TAMPA, req: request({ party: { adults: 2, kids: 0, over21: true } }) }
+
+  const ageOf = async (c: Parameters<typeof candidate>[0], context = ctx) => {
+    const cand = candidate(c)
+    const { verdicts } = await screen([cand], context)
+    const v = verdicts.get(cand.id)!
+    return { fatal: v.fatal, age: v.findings.find((f) => f.dimension === "age")! }
+  }
+
+  test("a brewery is refused outright when nobody said they are 21", async () => {
+    // Refused, not demoted. "Never show up" is the whole promise of the
+    // flag, and only a fatal verdict keeps it out of the store as well as
+    // out of the plan.
+    const v = await ageOf({ title: "Coppertail Brewing Co.", category: "drink" })
+    assert.equal(v.age.state, "fail")
+    assert.equal(v.age.fatal, true)
+    assert.equal(v.fatal, true)
+  })
+
+  test("the same brewery is fine once the box is ticked", async () => {
+    const v = await ageOf({ title: "Coppertail Brewing Co.", category: "drink" }, adultCtx)
+    assert.equal(v.age.state, "ok")
+    assert.equal(v.fatal, false)
+  })
+
+  test("everything else is untouched either way", async () => {
+    for (const context of [ctx, adultCtx]) {
+      const v = await ageOf({ title: "Tampa Riverwalk", category: "outdoors" }, context)
+      assert.equal(v.age.state, "ok")
+      assert.equal(v.age.points, 0)
+      assert.equal(v.fatal, false)
+    }
+  })
+
+  test("the refusal says why, in the user's own terms", async () => {
+    const v = await ageOf({ title: "Angel's Share Speakeasy", category: "other" })
+    assert.match(v.age.why, /21/)
+  })
+})

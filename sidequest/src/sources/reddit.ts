@@ -27,7 +27,7 @@ import type { Candidate, Place } from "../types.js"
 import { buildCandidate, guessCategory } from "./util.js"
 
 /** Reddit requires a descriptive UA and rate-limits generic ones harshly. */
-const USER_AGENT = "nodejs:weekendfun:0.1.0 (by /u/weekendfun-bot)"
+const USER_AGENT = "nodejs:sidequest:0.1.0 (by /u/sidequest-bot)"
 
 export function redditConfigured(): boolean {
   return Boolean(process.env.REDDIT_CLIENT_ID && process.env.REDDIT_CLIENT_SECRET)

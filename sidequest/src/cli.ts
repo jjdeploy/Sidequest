@@ -1,5 +1,5 @@
 /**
- * Bearings CLI.
+ * Sidequest CLI.
  *
  *   npm run plan -- "Tampa, FL" --vibes "chill, live music" --budget 200
  *   npm run plan -- "Seattle, WA" --ask "cheap date night, no driving"
@@ -20,7 +20,7 @@ import { Store } from "./store/db.js"
 import type { Mobility, PlanRequest } from "./types.js"
 import type { PoolEvent } from "./solari/pool.js"
 
-const DB_PATH = process.env.WEEKENDFUN_DB ?? resolve(process.cwd(), "data", "weekendfun.db")
+const DB_PATH = process.env.SIDEQUEST_DB ?? resolve(process.cwd(), "data", "sidequest.db")
 
 // ─────────────────────────────────────────────────────────── arg parsing
 
@@ -64,7 +64,7 @@ const list = (a: Args, k: string) =>
  * Every flag this CLI takes. Only used to notice when npm has eaten them.
  */
 const KNOWN_FLAGS = [
-  "vibes", "budget", "adults", "kids", "mobility", "avoid", "days", "ask",
+  "vibes", "budget", "adults", "kids", "over21", "mobility", "avoid", "days", "ask",
   "sources", "concurrency", "retries", "keywords", "source-timeout",
   "explain", "record", "writeup",
 ]
@@ -128,7 +128,7 @@ function renderProgress(e: PoolEvent): void {
       console.log(`  ✕ ${e.source.padEnd(13)} ${e.reason.slice(0, 60)}`)
       break
     case "note":
-      if (process.env.WEEKENDFUN_VERBOSE) console.log(`      ${e.source}: ${e.msg.slice(0, 80)}`)
+      if (process.env.SIDEQUEST_VERBOSE) console.log(`      ${e.source}: ${e.msg.slice(0, 80)}`)
       break
   }
 }
@@ -187,6 +187,7 @@ async function cmdPlan(args: Args): Promise<void> {
     days: days.length ? days : undefined,
     adults: num(args, "adults", 2),
     kids: num(args, "kids", 0),
+    over21: bool(args, "over21"),
     budgetUsd: num(args, "budget", 200),
     vibes: list(args, "vibes"),
     mobility: (str(args, "mobility", "car") as Mobility) ?? "car",
@@ -195,7 +196,7 @@ async function cmdPlan(args: Args): Promise<void> {
   })
 
   console.log(`\n${BAR}`)
-  console.log(`Bearings — ${req.place.label}`)
+  console.log(`Sidequest — ${req.place.label}`)
   console.log(BAR)
   if (alternates.length > 0) {
     console.log(`(also matched ${alternates.map((a) => a.label).join(", ")} — qualify the name to pick another)`)
@@ -203,7 +204,7 @@ async function cmdPlan(args: Args): Promise<void> {
   if (askNote) console.log(`Read your request as: ${askNote}`)
   console.log(
     `${req.days.join(" and ")} · ${req.party.adults} adults${req.party.kids ? ` + ${req.party.kids} kids` : ""}` +
-      ` · $${req.budgetUsd} · ${req.mobility}`,
+      ` · $${req.budgetUsd} · ${req.mobility}${req.party.over21 ? " · 21+" : ""}`,
   )
 
   // Checked up front so the "Writing it up…" line is only printed when
@@ -242,7 +243,8 @@ async function cmdPlan(args: Args): Promise<void> {
         console.log(
           `  place ${d.place.ok} ok / ${d.place.fail} elsewhere / ${d.place.unknown} unknown` +
             `   ·   time ${d.time.ok} ok / ${d.time.fail} other dates / ${d.time.unknown} undated` +
-            `   ·   kind ${d.kind.fail} filtered`,
+            `   ·   kind ${d.kind.fail} filtered` +
+            (d.age.fail > 0 ? `   ·   age ${d.age.fail} are 21+ rooms` : ""),
         )
         break
       }
@@ -272,7 +274,7 @@ async function cmdPlan(args: Args): Promise<void> {
         keywordLimit: num(args, "keywords", 8),
         record: bool(args, "record"),
         writeup: wantsWriteUp,
-        verbose: Boolean(process.env.WEEKENDFUN_VERBOSE),
+        verbose: Boolean(process.env.SIDEQUEST_VERBOSE),
       },
       render,
     )
@@ -381,7 +383,7 @@ async function main(): Promise<void> {
       cmdSources()
       break
     default:
-      console.log(`Bearings — parallel cloud browsers that plan your weekend.
+      console.log(`Sidequest — parallel cloud browsers that plan your weekend.
 
   npm run plan -- "Tampa, FL"
   npm run plan -- "Seattle, WA" -- --vibes "outdoorsy, cheap" --budget 150
@@ -392,7 +394,7 @@ async function main(): Promise<void> {
   npm run dashboard              the browser UI: live fan-out, map, replays
   npm run geo-proof              prove the location targeting actually works
 
-Flags: --vibes --budget --adults --kids --mobility --avoid --days
+Flags: --vibes --budget --adults --kids --over21 --mobility --avoid --days
        --sources --concurrency --retries --explain --record --no-writeup
 
 Note the SECOND \`--\` before any flag. npm parses the first batch after

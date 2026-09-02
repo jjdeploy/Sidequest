@@ -36,6 +36,7 @@
  * from free text, but the planner works with it switched off.
  */
 import { CATEGORIES, type Category, type PlanRequest } from "../types.js"
+import { isAdultOnly, partyIsOver21 } from "./age.js"
 
 export interface Keyword {
   /** The literal search term handed to a source. */
@@ -191,7 +192,20 @@ function normalizeVibe(v: string): string[] {
 export function buildKeywords(req: PlanRequest, limit = 8): Keyword[] {
   const out = new Map<string, Keyword>()
 
+  // Everyone is 21, or nobody is. See engine/age.ts.
+  const adult = partyIsOver21(req)
+
   const add = (term: string, category: Category, because: string, weight: number) => {
+    // Don't spend a browser on a room the party can't enter.
+    //
+    // The admission gate would throw these results away anyway, so this is
+    // not the safety check — it is the budget. Each keyword is one of eight
+    // browsers, and "cocktail bars" was taking one of them to produce a page
+    // of candidates already decided against. Refusing here rather than
+    // filtering the finished list also lets the floor top the set back up,
+    // so a nightlife request from a 19-year-old still comes back with eight
+    // real searches instead of four.
+    if (!adult && isAdultOnly({ title: term, category })) return
     const key = term.toLowerCase()
     const existing = out.get(key)
     // Two vibes asking for the same thing is evidence, not a duplicate — keep
@@ -236,7 +250,18 @@ export function buildKeywords(req: PlanRequest, limit = 8): Keyword[] {
     add("downtown walkable area", "other", "you're on foot, so density beats variety", 0.7)
   }
 
-  // 5. The floor.
+  // 5. Ticking 21+ has to change the search, or it is decorative.
+  //
+  //    Deliberately below ASKED_FOR: engine/itinerary.ts reserves a slot for
+  //    every category at or above that weight, and 21+ is permission, not a
+  //    request. It should make a bar POSSIBLE, not compulsory — somebody who
+  //    ticks the box and asks for hiking wants hiking.
+  if (adult) {
+    add("cocktail bars", "drink", "you said the party is 21+", 0.7)
+    add("breweries", "drink", "you said the party is 21+", 0.7)
+  }
+
+  // 6. The floor.
   //
   //    Only tops up — it never overrides stated intent, because "don't search
   //    restaurants if they didn't ask about food" is the whole point of

@@ -383,8 +383,13 @@ describe("a time phrase is a time, not a mood", () => {
   })
 
   test('"bowling at night" asks for bowling, not for nightlife', () => {
-    const withTime = requestedCategories(buildKeywords(request({ vibes: ["bowling at night"] }), 8))
-    const stripped = requestedCategories(buildKeywords(request({ vibes: [stripTimeWords("bowling at night")] }), 8))
+    // A 21+ party on both sides, because the point being demonstrated here is
+    // the time word contaminating the vibe read. Without the flag the 21+
+    // gate drops the nightlife terms first and the contamination is invisible
+    // — still fixed, but fixed by the wrong rule to be testing.
+    const party = { adults: 2, kids: 0, over21: true }
+    const withTime = requestedCategories(buildKeywords(request({ party, vibes: ["bowling at night"] }), 8))
+    const stripped = requestedCategories(buildKeywords(request({ party, vibes: [stripTimeWords("bowling at night")] }), 8))
     assert.ok(withTime.has("nightlife"), "the whole sentence drags nightlife in")
     assert.ok(!stripped.has("nightlife"), `stripped still asked for: ${[...stripped].join(", ")}`)
     assert.ok(stripped.has("active"), "but it still asks for bowling")
@@ -452,5 +457,59 @@ describe("an event goes in the slot it actually starts in", () => {
     const venue = scored(candidate({ id: "park", category: "outdoors" }), 500)
     const it = buildItinerary([venue], request(), [])
     assert.equal(it.days.flatMap((d) => d.items).length, 1)
+  })
+})
+
+describe("buildKeywords: don't spend a browser on a bar you can't enter", () => {
+  const terms = (r: Parameters<typeof buildKeywords>[0]) => buildKeywords(r).map((k) => k.term)
+
+  test("a nightlife request finds nothing to search when the party isn't 21+", () => {
+    // The gate would throw these results away anyway. Searching for them
+    // first burns browsers out of a budget of eight — the expensive resource
+    // spent on candidates that are already decided.
+    const t = terms(request({ vibes: ["nightlife"] }))
+    assert.ok(!t.some((x) => /bar|brewer|club/.test(x)), `still asking for: ${t.join(", ")}`)
+  })
+
+  test("...and still comes back with a full set of terms", () => {
+    // Filtering must not leave a thin query set. The floor tops it back up.
+    assert.ok(terms(request({ vibes: ["nightlife"] })).length >= 5)
+  })
+
+  test("ticking 21+ puts the bars back", () => {
+    const t = terms(request({ vibes: ["nightlife"], party: { adults: 2, kids: 0, over21: true } }))
+    assert.ok(t.some((x) => /bar|brewer|club/.test(x)), `expected nightlife terms, got: ${t.join(", ")}`)
+  })
+
+  test("21+ on its own is enough to look for a drink", () => {
+    // Ticking the box with no vibes at all should change the search, or the
+    // flag is decorative.
+    const t = terms(request({ party: { adults: 2, kids: 0, over21: true } }))
+    assert.ok(t.some((x) => /bar|brewer/.test(x)), t.join(", "))
+  })
+
+  test("but it never becomes a reservation", () => {
+    // requestedCategories drives the itinerary's one-slot guarantee. Ticking
+    // 21+ makes a bar POSSIBLE; it must not make one COMPULSORY.
+    const cats = requestedCategories(buildKeywords(request({ party: { adults: 2, kids: 0, over21: true } })))
+    assert.ok(!cats.has("drink"), "21+ should widen the search, not reserve a slot")
+  })
+})
+
+describe("buildItinerary: a brewery is not a ten-in-the-morning plan", () => {
+  test("the best-reviewed brewery in town still does not open the weekend", () => {
+    // Asheville with 21+ ticked came back with New Belgium at 10am on the
+    // Saturday: the slot preference costs a drink venue ten points, and a
+    // brewery that big clears ten points on reviews alone. Time of day is not
+    // a preference for this category — it is the difference between a plan
+    // somebody follows and one they laugh at.
+    const brewery = scored(candidate({ id: "brew", category: "drink", rating: 4.8, reviewCount: 5000 }), 95)
+    const rest = Array.from({ length: 8 }, (_, i) =>
+      scored(candidate({ id: `f-${i}`, category: i % 2 ? "outdoors" : "culture" }), 20 - i))
+    const it = buildItinerary([brewery, ...rest], request({ party: { adults: 2, kids: 0, over21: true } }), [])
+
+    const slots = it.days.flatMap((d) => d.items).filter((i) => i.scored.candidate.id === "brew")
+    assert.equal(slots.length, 1, "it should still be in the weekend somewhere")
+    assert.notEqual(slots[0]!.slot, "Morning")
   })
 })

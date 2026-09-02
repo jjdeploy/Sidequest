@@ -151,6 +151,16 @@ export function buildItinerary(
         const startsIn = eventPartOfDay(c)
         if (startsIn !== null && startsIn !== slot.label.toLowerCase()) continue
 
+        // Nobody wants a brewery at ten in the morning.
+        //
+        // The slot preference below costs a drink venue ten points in the
+        // wrong slot, and Asheville with 21+ ticked showed what ten points is
+        // worth: New Belgium Brewing, 4.8 from thousands of reviews, opened
+        // the Saturday. For this one category the hour is not a preference to
+        // be outbid — it is the difference between a plan somebody follows
+        // and one they laugh at.
+        if (slot.label === "Morning" && (c.category === "drink" || c.category === "nightlife")) continue
+
         // Cost is per person; a $40 ticket for a family of four is $160.
         const cost = (c.priceUsd ?? 0) * heads
         if (cost > remainingBudget) continue

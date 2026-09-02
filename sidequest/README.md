@@ -1,4 +1,4 @@
-# Bearings
+# Sidequest
 
 **You're bored. This town isn't.**
 
@@ -134,16 +134,17 @@ something plausible and nobody checked:
 - `&amp; Ho... Read more` stored as a street address (nobody checked the text)
 
 Each got fixed where it was found, which is why the next one kept appearing
-somewhere else. `engine/relevance.ts` asks three questions of every candidate
+somewhere else. `engine/relevance.ts` asks four questions of every candidate
 from every source — is it near this city, is it on these days, is it a thing
-you'd actually go and do — and attaches a verdict that ranking explains and the
-itinerary obeys.
+you'd actually go and do, and is the party old enough to get in — and attaches
+a verdict that ranking explains and the itinerary obeys.
 
 ```
 106 listings · 66 admitted · 40 rejected
   place  51 confirmed · 1 elsewhere · 31 published no location
   dates  72 on your days · 11 on other dates
   kind    6 filtered as business, admin, or a broken scrape
+  age     9 refused as 21+ rooms
 ```
 
 Three rules it holds to:
@@ -156,6 +157,35 @@ Three rules it holds to:
   distance can reject outright. A city name matched in free text cannot —
   "Orlando's Bar" is a real Tampa venue — so that tier only costs points.
 - **Findings carry their reason**, and become score components verbatim.
+
+### The 21+ switch
+
+One control on the landing page is a gate rather than a nudge. Every other
+preference leans on the score — a vibe raises it, a budget trims the list,
+weather demotes a park. This one removes things: leave 21+ off and nothing
+that would card you reaches the plan at all. Not ranked low, not greyed out,
+not sitting in the catalogue underneath. Absent.
+
+Which means reading a listing's age with no field that says so, and the two
+halves of a listing are worth very different amounts:
+
+- **The name is evidence.** "Coppertail Brewing Co." is a brewery. A place
+  called a taproom is a taproom.
+- **The blurb is not.** Evidence text mentions a bar constantly — "cash bar",
+  "full bar" — at weddings, food halls and street festivals anyone can walk
+  into. Matching venue words there would quietly delete the family end of the
+  plan. An age the listing states outright (`21+`, `18 and over`) is the
+  exception, and it settles the question wherever it appears — but `$18+` is
+  a ticket price, and reading that as an age gate would delete the cheap end
+  of every event source.
+
+It is enforced twice. `engine/relevance.ts` is the guarantee; `engine/
+keywords.ts` is the budget — searching for "cocktail bars" would spend one of
+eight browsers on a page of candidates already decided against. Ticking the
+box widens the search but never reserves a slot: 21+ is permission, not a
+request, and somebody who ticks it and asks for hiking wants hiking. A kid in
+the party overrides the tick, because that is the answer that names a real
+person. See `engine/age.ts`.
 
 ## The six sources answer different questions
 
@@ -387,7 +417,7 @@ npm run geo-proof                     prove the location targeting works
 npm run harden                        run every source against several cities
 ```
 
-Flags: `--vibes --budget --adults --kids --mobility --avoid --days --sources --concurrency --retries --explain --record --no-writeup`
+Flags: `--vibes --budget --adults --kids --over21 --mobility --avoid --days --sources --concurrency --retries --explain --record --no-writeup`
 
 **Note the second `--` before any flag.** npm parses the first batch after `--`
 as its own config and drops the flag names, so a single dash runs with defaults
@@ -453,7 +483,8 @@ src/
   solari/geo.ts       the geolocation gate (and why proxy pinning is dead)
   solari/pool.ts      sharded fan-out, live-session tracking, global deadline
   engine/keywords.ts  what to search for, decided before any browser launches
-  engine/relevance.ts the admission gate: place, time, kind
+  engine/relevance.ts the admission gate: place, time, kind, age
+  engine/age.ts       what counts as a 21+ room, and why it is two gates
   engine/score.ts     deterministic ranking with named components
   engine/itinerary.ts ranked list -> an actual schedule
   engine/learn.ts     signals -> taste vector

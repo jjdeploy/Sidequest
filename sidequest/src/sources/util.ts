@@ -109,7 +109,12 @@ export function guessCategory(text: string, fallback: Category = "other"): Categ
     // brewer(y|ies), historic(al), amphitheat(re|er).
     [/\b(museums?|galler(?:y|ies)|history|historic\w*|theat\w*|arts?|artists?|exhibits?|librar(?:y|ies)|cultural|heritage)\b/, "culture"],
     [/\b(bars?|brewer\w*|brewing|cocktails?|wine|pubs?|distiller\w*|taproom|cider|speakeasy)\b/, "drink"],
-    [/\b(clubs?|nightlife|dancing?|dj|lounges?)\b/, "nightlife"],
+    // "club" and "lounge" on their own were filing Sam's Club, BJ's Wholesale
+    // Club, the Italian Club and a Gaming Lounge under nightlife. Harmless
+    // while the category was only a learning bucket; not harmless once the
+    // 21+ gate started reading it, because a warehouse store became a room a
+    // twenty-year-old is turned away from. Say which kind of club.
+    [/\b(night ?clubs?|dance clubs?|strip clubs?|nightlife|dancing?|dj|discos?)\b/, "nightlife"],
     [/\b(concerts?|live music|bands?|music venue|jazz|symphony|orchestra|amphitheat\w*|open mic)\b/, "music"],
     [/\b(parks?|trails?|gardens?|beach\w*|hikes?|hiking|nature|lakes?|rivers?|botanical?|waterfront|greenway|boardwalk)\b/, "outdoors"],
     [/\b(kayak\w*|bikes?|biking|climbing|gyms?|surf\w*|skat\w+|paddle\w*|yoga|pilates|fitness|workout|bootcamp|run(?:ning)? club|golf|tennis)\b/, "active"],

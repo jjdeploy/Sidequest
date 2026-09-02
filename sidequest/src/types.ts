@@ -65,6 +65,14 @@ export interface PlanRequest {
     kids: number
     /** Ages of the kids, when known — drives the family filter. */
     kidAges?: number[]
+    /**
+     * Everyone in the party is 21 or over.
+     *
+     * A gate rather than a preference: with this unset, nothing that would
+     * turn a twenty-year-old away reaches the plan at all. See engine/age.ts
+     * for what counts and why it is enforced in two places.
+     */
+    over21?: boolean
   }
   /** Total budget for the whole plan, in USD, across the whole party. */
   budgetUsd: number

@@ -39,8 +39,9 @@ import { milesBetween } from "../sources/util.js"
 import { isJunkEvent } from "../sources/util.js"
 import { isDegenerate } from "../sources/text.js"
 import { eventDateOf, prettyDate } from "../sources/when.js"
+import { isAdultOnly, partyIsOver21 } from "./age.js"
 
-export type Dimension = "place" | "time" | "kind"
+export type Dimension = "place" | "time" | "kind" | "age"
 export type State = "ok" | "fail" | "unknown"
 
 export interface Finding {
@@ -211,6 +212,31 @@ function checkKind(c: Candidate): Finding {
   return { dimension: "kind", state: "ok", fatal: false, points: 0, why: "a real thing to go and do" }
 }
 
+// ───────────────────────────────────────────────────────────────────── age
+
+/**
+ * The 21+ gate.
+ *
+ * The only check here whose answer depends on the party rather than on the
+ * listing, and the only one where the user has explicitly asked for a hard
+ * line. Everything else in this file is trying to work out whether a listing
+ * is what it claims to be; this one already knows, and is asking whether the
+ * people going are allowed in.
+ *
+ * Fatal in one direction only. Ticking 21+ opens the bars; it never closes
+ * the aquarium.
+ */
+function checkAge(c: Candidate, ctx: ScreenContext): Finding {
+  if (!isAdultOnly(c)) {
+    return { dimension: "age", state: "ok", fatal: false, points: 0, why: "nobody gets carded for this" }
+  }
+  return partyIsOver21(ctx.req)
+    ? { dimension: "age", state: "ok", fatal: false, points: 0,
+        why: "a 21+ room, and you said the party is 21+" }
+    : { dimension: "age", state: "fail", fatal: true, points: -60,
+        why: "a 21-and-over room — tick 21+ if that's your party" }
+}
+
 // ────────────────────────────────────────────────────────────────── screen
 
 export interface ScreenSummary {
@@ -240,6 +266,7 @@ export async function screen(
       place: { ok: 0, fail: 0, unknown: 0 },
       time: { ok: 0, fail: 0, unknown: 0 },
       kind: { ok: 0, fail: 0, unknown: 0 },
+      age: { ok: 0, fail: 0, unknown: 0 },
     },
   }
 
@@ -249,7 +276,7 @@ export async function screen(
     // penalties when the scorer merges them.
     if (verdicts.has(c.id)) continue
 
-    const findings = [await checkPlace(c, ctx), checkTime(c, ctx), checkKind(c)]
+    const findings = [await checkPlace(c, ctx), checkTime(c, ctx), checkKind(c), checkAge(c, ctx)]
     const fatal = findings.some((f) => f.fatal)
     verdicts.set(c.id, { findings, fatal })
 

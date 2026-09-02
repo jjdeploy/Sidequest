@@ -71,6 +71,23 @@ describe("guessCategory: things that must keep working", () => {
   }
 })
 
+describe("guessCategory: a club is not necessarily that kind of club", () => {
+  test("a warehouse store is not nightlife", () => {
+    // The bare token "club" filed Sam's Club and BJ's Wholesale Club under
+    // nightlife, which was harmless until the 21+ gate started reading the
+    // category — at which point a warehouse store became a room a
+    // twenty-year-old is turned away from.
+    assert.notEqual(guessCategory("Sam's Club"), "nightlife")
+    assert.notEqual(guessCategory("BJ's Wholesale Club"), "nightlife")
+    assert.notEqual(guessCategory("Italian Language Program @ the Italian Club"), "nightlife")
+  })
+
+  test("an actual nightclub still is", () => {
+    assert.equal(guessCategory("Club Prana Nightclub"), "nightlife")
+    assert.equal(guessCategory("Vibe Dance Club"), "nightlife")
+  })
+})
+
 describe("categoryFromMapsType", () => {
   test('"Coffee shop" is food, not shopping', () => {
     assert.equal(categoryFromMapsType("Coffee shop"), "food")

@@ -18,6 +18,7 @@
 import { randomUUID } from "node:crypto"
 import { buildItinerary, type Itinerary } from "./engine/itinerary.js"
 import { buildKeywords, requestedCategories, stripTimeWords, timeOfDayFrom, type Keyword } from "./engine/keywords.js"
+import { isAdultOnly, partyIsOver21 } from "./engine/age.js"
 import { describeTaste } from "./engine/learn.js"
 import { makeLocalityResolver } from "./engine/localities.js"
 import { screen, type ScreenSummary, type Verdict } from "./engine/relevance.js"
@@ -74,6 +75,9 @@ export interface RequestDraft {
   days?: string[]
   adults?: number
   kids?: number
+  /** Everyone in the party is 21+. Off unless someone says so — see
+   *  engine/age.ts for what that closes off and why it is a gate. */
+  over21?: boolean
   budgetUsd?: number
   vibes?: string[]
   mobility?: Mobility
@@ -99,7 +103,7 @@ export async function resolvePlanRequest(where: string, draft: RequestDraft): Pr
   const req: PlanRequest = {
     place,
     days: draft.days?.length ? draft.days : nextWeekend(place.timezone),
-    party: { adults: draft.adults ?? 2, kids: draft.kids ?? 0 },
+    party: { adults: draft.adults ?? 2, kids: draft.kids ?? 0, over21: draft.over21 === true },
     budgetUsd: draft.budgetUsd ?? 200,
     vibes: draft.vibes?.filter(Boolean) ?? [],
     mobility: draft.mobility ?? "car",
@@ -148,6 +152,18 @@ export async function resolvePlanRequest(where: string, draft: RequestDraft): Pr
         req.timeOfDay && `in the ${req.timeOfDay}`,
       ].filter(Boolean).join(" · ")
     }
+  }
+
+  // They typed a request for a drink and never ticked the box.
+  //
+  // The gate is about to remove every bar in town, and without this the
+  // plan just comes back quietly short of what they asked for — the worst
+  // kind of wrong, because it looks like the town has nothing rather than
+  // like a setting they can change.
+  if (draft.ask && !partyIsOver21(req) && isAdultOnly({ title: draft.ask })) {
+    askNote = [askNote, "bars and breweries stay out until you tick 21+"]
+      .filter(Boolean)
+      .join(" · ")
   }
 
   return { req, alternates, askNote }
@@ -474,7 +490,8 @@ export async function runPlan(
 /** Compact text handed to Claude for the write-up. */
 export function summarizeForWriteUp(it: Itinerary, req: PlanRequest): string {
   const lines = [
-    `Trip: ${req.place.label}. Party: ${req.party.adults} adults, ${req.party.kids} kids. ` +
+    `Trip: ${req.place.label}. Party: ${req.party.adults} adults, ${req.party.kids} kids` +
+      `${partyIsOver21(req) ? ", all 21+" : " (not all 21+, so no bars were considered)"}. ` +
       `Budget: $${req.budgetUsd}. Getting around by ${req.mobility}. ` +
       `Vibes: ${req.vibes.join(", ") || "unspecified"}.`,
   ]

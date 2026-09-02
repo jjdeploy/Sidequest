@@ -1,4 +1,4 @@
-# Bearings
+# Sidequest
 
 **You're bored. This town isn't.**
 
@@ -10,20 +10,20 @@ So this doesn't ask. It opens real browsers in the cloud, stands them at your co
 
 A fork of the [Solari cookbook](https://github.com/solari-sdk/solari-cookbook) with a real application on top, built on [Solari](https://getsolari.com).
 
-### → [**`weekendfun/`**](weekendfun) — the project, and the full write-up
+### → [**`sidequest/`**](sidequest) — the project, and the full write-up
 
 ```bash
-cd weekendfun
+cd sidequest
 npm install
 cp .env.example .env      # add your SOLARI_API_KEY
 npm run dashboard         # http://localhost:5173
 ```
 
-![The landing page](weekendfun/docs/landing.jpg)
+![The landing page](sidequest/docs/landing.jpg)
 
 ## Thirteen browsers, all standing in your city
 
-![The fan-out](weekendfun/docs/fanout.jpg)
+![The fan-out](sidequest/docs/fanout.jpg)
 
 One browser per source — and for Google Maps, one browser per search term. The Starter plan allows twenty concurrent browsers; this uses thirteen and finishes in the time the slowest one takes, with a hard 20-second deadline and partial results treated as normal.
 
@@ -36,7 +36,7 @@ Same Palm Coast query, before and after that change:
 
 ## Then a plan, and everything else it found
 
-![The plan and the catalogue](weekendfun/docs/plan.jpg)
+![The plan and the catalogue](sidequest/docs/plan.jpg)
 
 ## Why it needs a cloud browser
 
@@ -58,7 +58,7 @@ Three more things make it a planner rather than a scraper:
 - **An admission gate.** Every candidate from every source is asked whether it's near this city, on these days, and a thing you'd actually go and do. "Unknown" is its own state and it gets counted, because 70% of listings publish no location at all and pretending otherwise is how bad results got in.
 - **It learns.** Rate a plan; the next one is different. Deterministic, inspectable, and it works with the LLM switched off.
 
-Full details, the measured dead ends, and six gotchas that each cost an afternoon: **[weekendfun/README.md](weekendfun/README.md)**.
+Full details, the measured dead ends, and six gotchas that each cost an afternoon: **[sidequest/README.md](sidequest/README.md)**.
 
 ---
 

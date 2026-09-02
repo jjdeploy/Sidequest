@@ -1,9 +1,9 @@
 {
-  "name": "bearings",
+  "name": "sidequest",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Real browsers, placed at your coordinates, reading every local listing at once. Get your bearings in a town you don't know yet.",
+  "description": "Real browsers, placed at your coordinates, reading every local listing at once. Find the side quest in a town you don't know yet.",
   "scripts": {
     "plan": "tsx --env-file-if-exists=.env src/cli.ts plan",
     "dashboard": "tsx --env-file-if-exists=.env src/web/server.ts",

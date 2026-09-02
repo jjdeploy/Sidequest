@@ -33,7 +33,7 @@ import { Store } from "./../store/db.js"
 import type { Mobility } from "./../types.js"
 
 const PUBLIC_DIR = resolve(fileURLToPath(new URL("./public", import.meta.url)))
-const DB_PATH = process.env.WEEKENDFUN_DB ?? resolve(process.cwd(), "data", "weekendfun.db")
+const DB_PATH = process.env.SIDEQUEST_DB ?? resolve(process.cwd(), "data", "sidequest.db")
 const PORT = Number(process.env.PORT ?? 5173)
 
 const MIME: Record<string, string> = {
@@ -211,6 +211,7 @@ async function handlePlan(req: IncomingMessage, res: ServerResponse, url: URL): 
       days: listOf(q.get("days")),
       adults: int(q.get("adults"), 2),
       kids: int(q.get("kids"), 0),
+      over21: q.get("over21") === "1",
       budgetUsd: int(q.get("budget"), 200),
       vibes: listOf(q.get("vibes")),
       mobility: (str(q.get("mobility"), "car") as Mobility) || "car",
@@ -386,7 +387,7 @@ dashboard failed: ${err.message}
 // Solari account; it has no auth and is not meant to.
 server.listen(PORT, "127.0.0.1", () => {
   const key = process.env.SOLARI_API_KEY ? "found" : "MISSING — copy .env.example to .env"
-  console.log(`\nBearings dashboard  →  http://localhost:${PORT}`)
+  console.log(`\nSidequest dashboard  →  http://localhost:${PORT}`)
   console.log(`  store        ${DB_PATH}`)
   console.log(`  SOLARI_API_KEY ${key}`)
   console.log(`  reddit       ${redditConfigured() ? "configured" : "not configured (source will skip)"}`)

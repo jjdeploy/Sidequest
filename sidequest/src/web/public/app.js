@@ -1,5 +1,5 @@
 /**
- * Bearings — client.
+ * Sidequest — client.
  *
  * No framework and no build step, for the same reason the server has no
  * dependencies: the repo's promise is `npm install` and go. This is three
@@ -249,7 +249,7 @@ async function boot() {
       hint.hidden = false
     }
   } catch {
-    showError("Can't reach the Bearings server. Is `npm run dashboard` still running?")
+    showError("Can't reach the Sidequest server. Is `npm run dashboard` still running?")
   }
 }
 
@@ -281,6 +281,12 @@ function wire() {
     state.explain = e.currentTarget.checked
     if (state.itinerary) renderPlan(state.itinerary)
   })
+  // Say what the switch did, rather than making someone run a plan to find
+  // out. It is the only control on the page that removes things.
+  $("over21").addEventListener("change", (e) => {
+    $("over21Note").hidden = !e.target.checked
+  })
+
   $("aboutOpen").addEventListener("click", showAbout)
   $("modalClose").addEventListener("click", closeModal)
   $("modal").addEventListener("click", (e) => { if (e.target === $("modal")) closeModal() })
@@ -322,6 +328,10 @@ function start() {
   const q = new URLSearchParams({
     city, vibes: [...state.moods].join(","), budget: "300", record: "1",
   })
+  // Only ever sent when it is on. An absent parameter and "over21=0" mean
+  // the same thing on the server, and sending the flag at all when it is off
+  // reads, in a shared URL, like a claim nobody made.
+  if ($("over21").checked) q.set("over21", "1")
   const weekend = state.weekends[state.weekendIndex]
   if (weekend) q.set("days", weekend.days.join(","))
   // Free text layers ON TOP of the chips rather than replacing them — asking
@@ -873,6 +883,12 @@ function renderRig() {
         "kind — ", el("span", { class: "bad" }, `${s.byDimension.kind.fail} filtered`),
         " as business listings, admin, or a broken scrape.",
       ]),
+      s.byDimension.age.fail > 0
+        ? el("div", {}, [
+            "age — ", el("span", { class: "bad" }, `${s.byDimension.age.fail} refused`),
+            " as 21+ rooms. Tick 21+ on the way in to allow them.",
+          ])
+        : null,
     )
   }
 
@@ -1052,7 +1068,7 @@ function closeModal() {
 function showAbout() {
   openModal("How this works", el("div", {}, [
     el("p", {}, "What's on near you is spread across a dozen sites, and none of them will sell you an API. Every attempt to unify local listings has died on exactly that — you'd have to convince every platform to cooperate."),
-    el("p", {}, "So Bearings doesn't ask. It opens real browsers in the cloud, stands them at your coordinates, and reads every source at the same time. A browser is a permissionless interface: if a site has a page, it can be read."),
+    el("p", {}, "So Sidequest doesn't ask. It opens real browsers in the cloud, stands them at your coordinates, and reads every source at the same time. A browser is a permissionless interface: if a site has a page, it can be read."),
     el("h4", {}, "Why standing there matters"),
     el("p", {}, "The web personalises on where your traffic comes from and what you've clicked before. If you've just moved, both of those are wrong, so it keeps showing you your old life. Every browser here proves where it is before it's allowed to search — which is also why you can plan a weekend in a city you haven't moved to yet."),
     el("h4", {}, "What decides the plan"),

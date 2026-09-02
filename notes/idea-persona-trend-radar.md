@@ -2,7 +2,7 @@
 
 **Status: idea only. Nothing built. Do not implement.**
 
-Parked here so it isn't lost. Separate project from Bearings — if it gets
+Parked here so it isn't lost. Separate project from Sidequest — if it gets
 built, it belongs in its own repo, not a branch of this one.
 
 ## The one-liner
@@ -35,7 +35,7 @@ version of this idea fails on exactly that.
 
 ## Second mechanic: corroboration, again
 
-The same scoring Bearings already uses, pointed sideways. A topic appearing
+The same scoring Sidequest already uses, pointed sideways. A topic appearing
 across four independent personas is signal; in one, it's noise.
 
 And the diff that matters is **over time** — what appeared today that wasn't
@@ -59,7 +59,7 @@ API and blocks everything else — see `weekendfun/src/sources/reddit.ts`.
 ## The honest constraints
 
 **ToS.** Automated access is against TikTok's and YouTube's terms. The posture
-has to match the one already taken on Reddit in Bearings: synthetic personas
+has to match the one already taken on Reddit in Sidequest: synthetic personas
 only, never a real account, no login, public surfaces, modest volume — and say
 so plainly in the README rather than staying quiet about it.
 
@@ -72,7 +72,7 @@ demonstrable.
 minutes before it is a useful sensor. This is exactly why profiles matter: pay
 it once, reuse it forever. First run minutes, every run after seconds.
 
-## What would transfer from Bearings
+## What would transfer from Sidequest
 
 Most of it. `solari/pool.ts` and `solari/geo.ts` nearly unchanged — personas
 shard exactly the way keywords do. Corroboration scoring, the SSE dashboard,
