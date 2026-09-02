@@ -217,180 +217,6 @@ fn glow(d: f32, r: f32, softness: f32) -> f32 {
 }
 `
 
-/**
- * The hero graphic: a town at night, seen from above.
- *
- * The one picture that says what this is. A dark card on a cream page —
- * deliberately the only dark surface in the product, because the thing being
- * sold is a Friday evening. Streets recede toward a horizon, lights come on
- * across the grid, and thirteen brighter points circle the middle: the
- * browsers, standing in the city, arriving one after another.
- *
- * The perspective is a cheap trick and the right one — dividing the plane by
- * depth before sampling the grid gives a receding surface in two lines, where
- * a real camera would need matrices, a vertex stage, and geometry to push
- * through it.
- */
-export const ART_WGSL = `
-struct Params {
-  time: f32,
-  aspect: f32,
-  lit: f32,
-}
-@group(0) @binding(0) var<uniform> params: Params;
-
-const SPACING = 7.0;
-const TAU = 6.283185307;
-
-fn h21(p: vec2f) -> f32 {
-  return fract(sin(dot(p, vec2f(127.1, 311.7))) * 43758.5453123);
-}
-
-fn sdBox(p: vec3f, b: vec3f) -> f32 {
-  let q = abs(p) - b;
-  return length(max(q, vec3f(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
-}
-
-/** How tall the block on this plot is. Zero means an empty one. */
-fn towerHeight(cell: vec2f) -> f32 {
-  let r = h21(cell);
-  // A quarter of the grid left empty: a city with something on every plot
-  // reads as a wall, and the gaps are what make the streets legible.
-  if (r < 0.26) { return 0.0; }
-  // Squared, so most of town is low and a few towers stand out of it.
-  let k = (r - 0.26) / 0.74;
-  return 2.0 + k * k * 22.0;
-}
-
-/**
- * The city, as a distance field.
- *
- * One box per grid cell, plus the ground plane. Only the cell the sample is
- * standing in is evaluated, not its neighbours — nine lookups a step is the
- * correct version and three times the cost, and the shortened steps in the
- * march below hide the overshoot that buys.
- */
-fn map(p: vec3f) -> f32 {
-  let cell = floor(p.xz / SPACING);
-  let h = towerHeight(cell);
-  if (h <= 0.0) { return p.y; }
-  let c = (cell + vec2f(0.5)) * SPACING;
-  let w = SPACING * 0.5 * (0.40 + 0.26 * h21(cell + vec2f(7.7, 3.1)));
-  let local = vec3f(p.x - c.x, p.y - h * 0.5, p.z - c.y);
-  return min(p.y, sdBox(local, vec3f(w, h * 0.5, w)));
-}
-
-@fragment fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
-  let t = params.time;
-  // -1..1 with y up.
-  let screen = vec2f((uv.x - 0.5) * 2.0 * params.aspect, (0.5 - uv.y) * 2.0);
-
-  // A slow drift down one avenue, drifting sideways, looking a little down.
-  let ro = vec3f(sin(t * 0.05) * 6.0, 54.0 + sin(t * 0.08) * 2.5, -t * 3.6);
-  // Not named "target": that is a reserved word in WGSL.
-  let look = ro + vec3f(sin(t * 0.04) * 0.10, -0.82, 0.86);
-  let fwd = normalize(look - ro);
-  let right = normalize(cross(vec3f(0.0, 1.0, 0.0), fwd));
-  let up = cross(fwd, right);
-  let rd = normalize(fwd * 1.35 + right * screen.x + up * screen.y);
-
-  // Sky: warm at the horizon, deep above. A town under cloud at nine.
-  let up01 = clamp(rd.y * 2.2 + 0.15, 0.0, 1.0);
-  var col = mix(vec3f(0.34, 0.14, 0.09), vec3f(0.026, 0.024, 0.058), pow(up01, 0.55));
-  col = col + ${MANGO} * pow(clamp(1.0 - abs(rd.y) * 3.4, 0.0, 1.0), 3.0) * 0.22;
-
-  var dist = 0.0;
-  var hit = false;
-  for (var i = 0; i < 92; i = i + 1) {
-    let pos = ro + rd * dist;
-    let d = map(pos);
-    // Tolerance grows with distance, so the far city costs no more steps
-    // than the near one.
-    if (d < 0.0025 * dist + 0.01) { hit = true; break; }
-    dist = dist + max(d * 0.72, 0.03);
-    if (dist > 190.0) { break; }
-  }
-
-  if (hit) {
-    let pos = ro + rd * dist;
-    let cell = floor(pos.xz / SPACING);
-    let h = towerHeight(cell);
-
-    if (pos.y < 0.35 || h <= 0.0) {
-      // Ground. Wet asphalt, with the street grid picked out on it.
-      var g = vec3f(0.020, 0.017, 0.028);
-      let lane = fract(pos.xz / SPACING);
-      let edge = max(1.0 - smoothstep(0.0, 0.05, min(lane.x, 1.0 - lane.x)),
-                     1.0 - smoothstep(0.0, 0.05, min(lane.y, 1.0 - lane.y)));
-      g = g + mix(${CORAL}, ${MANGO}, 0.4) * edge * 0.16;
-      // Traffic: one bright mote running each avenue.
-      let run = fract(pos.z * 0.035 - t * 0.30 + h21(vec2f(cell.x, 0.0)) * 5.0);
-      let inLane = 1.0 - smoothstep(0.0, 0.09, abs(lane.x - 0.5));
-      g = g + ${MANGO} * inLane * (1.0 - smoothstep(0.0, 0.05, run)) * 1.6;
-      col = g;
-    } else {
-      // A facade: dark concrete and a grid of windows, most of them out.
-      var f = vec3f(0.020, 0.017, 0.030);
-      let c = (cell + vec2f(0.5)) * SPACING;
-      let dx = abs(pos.x - c.x);
-      let dz = abs(pos.z - c.y);
-      // Which face was hit decides which axis the window grid runs along.
-      let acrossFace = select(pos.x, pos.z, dx > dz);
-      // A roof: flat, dark, with a light on the parapet. Without this the
-      // window grid is painted across the tops as well, which is the tell
-      // that a shader is sampling a position rather than a surface.
-      let onRoof = 1.0 - smoothstep(0.10, 0.55, abs(pos.y - h));
-
-      let win = vec2f(fract(acrossFace * 1.9), fract(pos.y * 1.25));
-      let id = vec2f(floor(acrossFace * 1.9), floor(pos.y * 1.25));
-      let seed = h21(id + cell * 31.7);
-      // Panes, with a mullion between them.
-      let pane = (1.0 - smoothstep(0.30, 0.44, abs(win.x - 0.5)))
-               * (1.0 - smoothstep(0.26, 0.40, abs(win.y - 0.5)));
-      // Half of them dark, the rest on their own slow schedule.
-      let on = step(0.70, seed) * (0.55 + 0.45 * sin(t * 0.6 + seed * 40.0));
-      f = f + mix(${MANGO}, ${CORAL}, seed * 0.8) * pane * on * (1.0 - onRoof) * 0.62;
-      // The parapet edge, so a roof still reads as a solid top.
-      f = f + ${CORAL} * onRoof * 0.045;
-      // A rim where the facade turns away, so the towers have edges.
-      let face = normalize(vec3f(pos.x - c.x, 0.0, pos.z - c.y));
-      f = f + ${CORAL} * pow(1.0 - abs(dot(rd, face)), 6.0) * 0.10;
-      col = f;
-    }
-
-    // Fog, so the far city dissolves into the horizon instead of ending.
-    let fog = 1.0 - exp(-max(dist - 24.0, 0.0) * 0.0125);
-    col = mix(col, vec3f(0.105, 0.055, 0.062), fog);
-  }
-
-  // The browsers: thirteen lights over the city, in screen space. They are
-  // not places, they are the things reading the places, so they sit above
-  // the picture rather than in it.
-  let c2 = vec2f((uv.x - 0.5) * params.aspect, uv.y - 0.42);
-  var ring = 0.0;
-  for (var i = 0; i < 13; i = i + 1) {
-    let fi = f32(i);
-    let a = (fi / 13.0) * TAU + t * 0.05;
-    let rp = vec2f(cos(a), sin(a) * 0.30) * 0.30;
-    let on = clamp(params.lit * 13.0 - fi, 0.0, 1.0);
-    let pulse = 0.78 + 0.22 * sin(t * 1.6 - fi * 0.9);
-    let dl = length(c2 - rp);
-    ring = ring + (1.0 - smoothstep(0.004, 0.010, dl)) * on * 1.2;
-    ring = ring + (1.0 - smoothstep(0.004, 0.030, dl)) * on * pulse * 0.55;
-    ring = ring + (1.0 - smoothstep(0.0, 0.11, dl)) * on * pulse * 0.13;
-  }
-  col = col + mix(${MANGO}, ${CORAL}, 0.3) * ring;
-
-  // Vignette, then a curve so the highlights roll off instead of clipping to
-  // white where the windows and the lights overlap.
-  col = col * (0.62 + 0.38 * (1.0 - smoothstep(0.35, 1.05, length(uv - vec2f(0.5)))));
-  col = col / (col + vec3f(0.62));
-  col = pow(col, vec3f(0.92));
-
-  return vec4f(col, 1.0);
-}
-`
-
 /** A handle that does nothing, for every path where the GPU is unavailable. */
 const NOOP = { ok: false, set() {}, stop() {} }
 
@@ -540,7 +366,7 @@ export function gpuReport() {
     device: Boolean(device),
     looping,
     drawing: mounted.size,
-    canvases: ["heroGpu", "heroArt", "waitGpu"].map((id) => {
+    canvases: ["heroGpu", "waitGpu"].map((id) => {
       const c = document.getElementById(id)
       return c
         ? `${id}: ${c.clientWidth}x${c.clientHeight}${c.classList.contains("is-live") ? " live" : " NOT live"}`
@@ -554,10 +380,6 @@ if (typeof window !== "undefined") window.sidequestGpu = gpuReport
 
 export function mountHero(canvas) {
   return mount(canvas, HERO_WGSL, { time: 0, fade: 1 })
-}
-
-export function mountArt(canvas) {
-  return mount(canvas, ART_WGSL, { time: 0, lit: 0 })
 }
 
 export function mountWait(canvas) {

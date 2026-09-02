@@ -129,36 +129,26 @@
 
         <div class="popular">
           <span class="field-label">Popular</span>
-          <div class="chips" id="moodChips"></div>
+          <div class="popular-row">
+            <div class="chips" id="moodChips"></div>
+            <!-- The one control here that is a gate rather than a nudge: left
+                 off, nothing that would card you reaches the plan at all. -->
+            <span class="agegate-wrap">
+              <label class="agegate" title="Everyone going is 21 or over. Off, and bars, nightclubs and cocktail lounges never appear.">
+                <input type="checkbox" id="over21" class="agegate-box">
+                <span class="agegate-switch" aria-hidden="true"></span>
+                <span class="agegate-label">21+</span>
+              </label>
+              <span class="agegate-note" id="over21Note" hidden>bars and clubs are in play</span>
+            </span>
+          </div>
           <span class="ask-hint" id="askHint" hidden></span>
-
-          <!-- The one control here that is a gate rather than a nudge: left
-               off, nothing that would card you reaches the plan at all. -->
-          <span class="agegate-wrap">
-            <span class="agegate-note" id="over21Note" hidden>bars, breweries and clubs are in play</span>
-            <label class="agegate" title="Everyone going is 21 or over. Off, and bars, breweries and clubs never appear.">
-              <input type="checkbox" id="over21" class="agegate-box">
-              <span class="agegate-switch" aria-hidden="true"></span>
-              <span class="agegate-label">21+</span>
-            </label>
-          </span>
         </div>
 
         <p class="ask-error" id="formError" hidden></p>
       </form>
     </div>
 
-    <!-- The one dark surface in the product, because the thing being sold is
-         a Friday evening. Thirteen lights circling a town seen from above:
-         the fan-out, as a picture. Hidden below 1040px, where the column it
-         sits beside has already taken the width. -->
-    <figure class="hero-art">
-      <canvas id="heroArt" aria-hidden="true"></canvas>
-      <figcaption>
-        <b>13 browsers</b>
-        <span>one town, read all at once</span>
-      </figcaption>
-    </figure>
 
   </div>
 

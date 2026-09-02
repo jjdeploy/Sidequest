@@ -16,7 +16,7 @@
  */
 import { test, describe, before, after } from "node:test"
 import assert from "node:assert/strict"
-import { ART_WGSL, HERO_WGSL, WAIT_WGSL } from "../src/web/public/gpu.js"
+import { HERO_WGSL, WAIT_WGSL } from "../src/web/public/gpu.js"
 
 const W = 96
 const H = 96
@@ -138,49 +138,16 @@ describe("the waiting screen", () => {
   })
 })
 
-describe("the hero graphic", () => {
-  test("is dark, which is the whole point of it", async (t) => {
-    const px = await render(ART_WGSL, { lit: 1 })
-    if (!px) return t.skip("no WebGPU adapter on this machine")
-    // The only dark surface in the product. If this comes back light, the
-    // card has failed to draw and is showing its own background.
-    assert.ok(luma(px) < 90, `mean luminance ${luma(px).toFixed(1)} — this is not a town at night`)
-  })
-
-  test("the sky is above and the ground is below", async (t) => {
-    const px = await render(ART_WGSL, { lit: 1 })
-    if (!px) return t.skip("no WebGPU adapter on this machine")
-    // Sampled either side of the horizon at 0.30. Two different scenes;
-    // if the perspective divide breaks they collapse into one flat colour.
-    const sky = at(px, W / 2, Math.round(H * 0.12))
-    const ground = at(px, W / 2, Math.round(H * 0.85))
-    assert.notDeepEqual(sky, ground, "sky and ground are identical — the plane did not draw")
-  })
-
-  test("it is warm, not grey", async (t) => {
-    const px = await render(ART_WGSL, { lit: 1 })
-    if (!px) return t.skip("no WebGPU adapter on this machine")
-    assert.ok(warmth(px) > 4, `warmth ${warmth(px).toFixed(1)} — the palette is not reaching it`)
-  })
-
-  test("the browsers arriving makes it brighter", async (t) => {
-    const none = await render(ART_WGSL, { lit: 0 })
-    const all = await render(ART_WGSL, { lit: 1 })
-    if (!none || !all) return t.skip("no WebGPU adapter on this machine")
-    assert.ok(luma(all) > luma(none), `${luma(none).toFixed(1)} -> ${luma(all).toFixed(1)}: the ring is not lighting`)
-  })
-})
-
-describe("one device, three shaders", () => {
-  test("all three live on a single context", async (t) => {
-    // The page draws three canvases. The first version gave each its own
+describe("one device, two shaders", () => {
+  test("both live on a single context", async (t) => {
+    // The page draws two canvases. An early version gave each its own
     // init(), which is against the grain of a library whose first line is
-    // "everything starts from one call" — and the hero graphic came out as a
-    // black rectangle. This is the architecture that replaced it: one
-    // device, three effects, all drawable.
+    // "everything starts from one call", and a later one cached the device
+    // rather than the promise and still made two. One device, two effects,
+    // both drawable.
     if (!lib || !gpu) return t.skip("no WebGPU adapter on this machine")
 
-    const shaders = [HERO_WGSL, ART_WGSL, WAIT_WGSL].map((src) =>
+    const shaders = [HERO_WGSL, WAIT_WGSL].map((src) =>
       lib!.effect(gpu!, src, {
         set: { params: { time: 1, aspect: 1, fade: 1, lit: 1, sending: 4, count: 13, energy: 0.5 } },
       }))

@@ -180,7 +180,7 @@ function closeWhen() {
 // Optional, always. See gpu.js — every one of these returns a handle whose
 // methods do nothing when WebGPU is unavailable, so nothing below branches
 // on whether it worked.
-import { mountArt, mountHero, mountWait } from "/gpu.js"
+import { mountHero, mountWait } from "/gpu.js"
 
 // ───────────────────────────────────────────────────────────────── state
 
@@ -206,7 +206,6 @@ const state = {
   explain: false,
   stream: null,
   heroGpu: null,
-  artGpu: null,
   waitGpu: null,
   place: null,
   gathered: null,
@@ -251,21 +250,7 @@ async function boot() {
     if (gpu.ok) document.body.classList.add("has-gpu")
   })
 
-  // The hero graphic lights its thirteen points over the first few seconds,
-  // which is the same beat the real fan-out has. Nothing drives it — it is a
-  // picture of the thing, not a readout of it.
-  mountArt($("heroArt")).then((gpu) => {
-    state.artGpu = gpu
-    if (!gpu.ok) return
-    const started = performance.now()
-    const tick = () => {
-      const lit = Math.min(1, (performance.now() - started) / 4200)
-      gpu.set({ lit })
-      if (lit < 1) requestAnimationFrame(tick)
-    }
-    tick()
-  })
-  try {
+ try {
     const s = await (await fetch("/api/state")).json()
     state.weights = s.weights
     $("landingStats").textContent = s.counts.runs > 0
