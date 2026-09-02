@@ -291,8 +291,17 @@ function wire() {
   $("planForm").addEventListener("submit", (e) => { e.preventDefault(); if (!state.running) start() })
   // The wordmark is the way back. One header means one home button, rather
   // than a different escape hatch on each screen.
+  // The one control that always works.
+  //
+  // It used to bail out on `state.running`, which made the logo dead for the
+  // whole twenty seconds of a run — the exact window in which somebody most
+  // wants a way out — and dead permanently after any run that ended without
+  // clearing the flag. A mark in the top-left corner is the universal "take
+  // me back"; it does not get to be conditional.
   $("brandHome").addEventListener("click", () => {
-    if (state.running) return
+    if (state.running) finish()
+    closeModal()
+    closeWhen()
     screen("landing")
     $("city").focus()
   })
