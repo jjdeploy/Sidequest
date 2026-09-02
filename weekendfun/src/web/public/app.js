@@ -64,6 +64,17 @@ const CATEGORY_ART = {
   other:     ["📍", "#c2b2a3", "#8a7768"],
 }
 
+/** The sources under the names they go by, not their slugs. */
+const SOURCE_NAME = {
+  "google-maps": "Google Maps",
+  eventbrite: "Eventbrite",
+  allevents: "AllEvents",
+  groupon: "Groupon",
+  tripadvisor: "TripAdvisor",
+  timeout: "Time Out",
+  reddit: "Reddit",
+}
+
 /** Category labels in the user's words, not the enum's. */
 const CATEGORY_LABEL = {
   food: "food", drink: "drinks", outdoors: "outdoors", culture: "culture",
@@ -171,6 +182,7 @@ const state = {
   t0: 0,
   lanes: new Map(),
   laneEls: new Map(),
+  blipEls: new Map(),
   span: 20_000,
   recording: false,
   moods: new Set(),
@@ -319,11 +331,14 @@ function start() {
 
   state.running = true
   state.t0 = performance.now()
-  state.lanes.clear(); state.laneEls.clear()
+  state.lanes.clear(); state.laneEls.clear(); state.blipEls.clear()
   state.span = 20_000
   state.catalogue = []; state.planned.clear(); state.expanded.clear(); state.filter = "all"
   state.gathered = null; state.screened = null
-  clear($("lanes")); clear($("terms"))
+  clear($("lanes")); clear($("terms")); clear($("blips"))
+  $("foundCount").textContent = "0"
+  $("foundLabel").textContent = "standing by"
+  $("workingLine").textContent = "Getting a fix on the place…"
   $("writeupBlock").hidden = true
   $("formError").hidden = true
   $("go").disabled = true
@@ -378,6 +393,7 @@ function onPlace(e) {
   $("statusPlace").textContent = e.place.label
   $("statusCoords").textContent = `${e.place.lat.toFixed(4)}, ${e.place.lng.toFixed(4)}`
   renderHere(e.place)
+  drawDial()
   // What the model made of the free text, shown before the results so a
   // misreading is visible while it still explains the plan.
   state.askNote = e.askNote
@@ -400,7 +416,31 @@ function onLaunching(e) {
   // "8 of 13 in position" beats a bare count: it says how far through it is.
   $("readyTotal").textContent = String(e.browsers ?? e.sources.length)
   const lanes = $("lanes")
+  const blips = $("blips")
   clear(lanes)
+  clear(blips)
+  state.blipEls.clear()
+
+  // Blips sit just outside the dial, evenly spaced, starting at the top.
+  // The label flips to whichever side keeps it off the face.
+  e.sources.forEach((id, i) => {
+    // Angle only. The radius is a CSS variable so the dial can shrink on a
+    // phone without JS having to know how wide the page is.
+    const deg = -90 + (i * 360) / e.sources.length
+    const up = Math.sin(deg * (Math.PI / 180)) < 0
+    const dot = el("span", { class: "blip-dot" })
+    const out = el("span", { class: "blip-out" }, "·")
+    const blip = el("div", {
+      class: `blip ${up ? "blip--up" : "blip--down"}`,
+      style: `--a:${deg}deg`,
+    }, [dot, el("span", { class: "blip-label" }, [
+      el("span", { class: "blip-name" }, SOURCE_NAME[id] ?? id),
+      out,
+    ])])
+    blips.append(blip)
+    state.blipEls.set(id, { blip, out, up })
+  })
+
   for (const id of e.sources) {
     state.lanes.set(id, {
       id, at: null, gatedAt: null, endAt: null, found: null,
@@ -451,7 +491,51 @@ function onPool(at, ev) {
   }
   const gated = [...state.lanes.values()].reduce((n, l) => n + l.gated, 0)
   $("readyCount").textContent = String(gated)
+  drawDial()
   draw()
+}
+
+/**
+ * The dial: what each source is doing, and the running total in the middle.
+ *
+ * Every line here is something that actually happened — a browser reaching
+ * its coordinates, a source answering with a count — rather than a spinner
+ * pretending time is passing. Waiting is easier when the wait is legible.
+ */
+function drawDial() {
+  const lanes = [...state.lanes.values()]
+  const found = lanes.reduce((n, l) => n + (l.found ?? 0), 0)
+  const gated = lanes.reduce((n, l) => n + l.gated, 0)
+  const settled = lanes.filter((l) => l.endAt !== null).length
+
+  for (const lane of lanes) {
+    const dom = state.blipEls.get(lane.id)
+    if (!dom) continue
+    const landed =
+      lane.found !== null ? "is-in"
+      : lane.status === "failed" ? "is-out"
+      : lane.gated > 0 ? "is-placed"
+      : ""
+    dom.blip.className = `blip ${dom.up ? "blip--up" : "blip--down"} ${landed}`
+    dom.out.textContent =
+      lane.found !== null ? `${lane.found} found`
+      : lane.status === "failed" ? "no answer"
+      : lane.gated > 0 ? "in position"
+      : "·"
+  }
+
+  $("foundCount").textContent = String(found)
+  $("foundLabel").textContent = found === 1 ? "place found" : "places found"
+
+  // `place` arrives before `launching`, so an empty lane set means the
+  // browsers aren't up yet — not that every source has finished.
+  const city = state.place?.city ?? "town"
+  $("workingLine").textContent =
+    !state.place ? "Getting a fix on the place…"
+    : lanes.length === 0 || gated === 0 ? `Opening browsers in ${city}…`
+    : settled === 0 ? `${gated} browsers standing in ${city}. Reading…`
+    : settled < lanes.length ? `${lanes.length - settled} sources still reading…`
+    : "Working out what actually fits your weekend."
 }
 
 function niceSpan(ms) {
@@ -615,6 +699,9 @@ function renderStop(item) {
       el("div", { class: "stop-hour" }, SLOT_TIME[item.slot] ?? ""),
       el("div", { class: "stop-part" }, item.slot),
     ]),
+    // The rail owns a column of its own so the line and the clock can't
+    // land on top of each other.
+    el("div", { class: "stop-rail", "aria-hidden": "true" }),
     renderThumb(c),
     el("div", { class: "stop-body" }, [
       el("div", { class: "stop-title" },

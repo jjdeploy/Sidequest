@@ -302,6 +302,28 @@ describe("saying WHEN you want it", () => {
     const it = buildItinerary([lanes(), ...filler()], request({ timeOfDay: "afternoon" }), [], new Set(["active"]), "afternoon")
     assert.equal(slotOf(it, "lanes"), "Afternoon")
   })
+
+  test("night still means night in a town with nothing else in it", () => {
+    // Palm Coast, verbatim. Withholding the reservation from the wrong slots
+    // is not enough on its own: in a small town the requested venue is often
+    // also the best thing available at ten in the morning, so it won the slot
+    // on merit before the evening ever came round. The whole point of saying
+    // "at night" is that it should be held back.
+    const thin = Array.from({ length: 10 }, (_, i) =>
+      scored(candidate({ id: `t-${i}`, category: i % 2 ? "outdoors" : "food", rating: 3.9 }), 4 - i * 0.2),
+    )
+    const it = buildItinerary([lanes(), ...thin], request({ timeOfDay: "evening" }), [], new Set(["active"]), "evening")
+    assert.equal(slotOf(it, "lanes"), "Evening")
+  })
+
+  test("but a held category still shows up if it is the only thing in town", () => {
+    // Held back, not banned. If the alternative is an empty slot, the plan
+    // takes the bowling alley at ten rather than printing an apology.
+    const only = [lanes(), scored(candidate({ id: "lanes-2", category: "active" }), 4)]
+    const it = buildItinerary(only, request({ timeOfDay: "evening" }), [], new Set(["active"]), "evening")
+    const slots = it.days.flatMap((d) => d.items).map((i) => i.slot)
+    assert.ok(slots.length > 0, "the plan should not come back empty")
+  })
 })
 
 describe("reading the request without asking a model", () => {

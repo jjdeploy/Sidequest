@@ -113,49 +113,43 @@
       </form>
     </div>
 
-    <!-- The right column is the argument, not decoration: the six things it
-         reads and why each one is there. Real content, so the hero isn't a
-         column of text with a gradient next to it. -->
-    <aside class="hero-side">
-      <div class="side-card">
-        <div class="side-head">
-          <span class="field-label">Read in parallel</span>
-          <span class="side-count">6 sources</span>
-        </div>
-        <ul class="side-list">
-          <li><b>Google Maps</b><span>every venue, with coordinates</span></li>
-          <li><b>Eventbrite</b><span>dated, ticketed events</span></li>
-          <li><b>AllEvents</b><span>the long tail, and small towns</span></li>
-          <li><b>Groupon</b><span>what's discounted right now</span></li>
-          <li><b>TripAdvisor</b><span>consensus, and review counts</span></li>
-          <li><b>Time Out</b><span>a local's reason to go</span></li>
-        </ul>
-        <div class="side-foot">
-          <span class="side-pin" aria-hidden="true"></span>
-          Each one proves where it is before it's allowed to search.
-        </div>
-      </div>
-    </aside>
   </div>
 
-  <ul class="pitch">
-    <li>
-      <b>Local, and provably so</b>
-      A browser whose location silently failed returns perfectly valid results
-      for the wrong city. So none of them are allowed to search until the page
-      itself confirms the coordinates.
-    </li>
-    <li>
-      <b>You don't have to be there yet</b>
-      Put in a city you're moving to. The answers are that city's, not a guess
-      made from where you're sitting.
-    </li>
-    <li>
-      <b>It learns what you actually did</b>
-      Keep or skip anything and the next weekend in that town comes back
-      ranked differently.
-    </li>
-  </ul>
+  <!-- What it reads and why that matters are the same argument, so they are
+       one block under the hero rather than a sidebar competing with the
+       search bar for the first thing you look at. -->
+  <section class="engine">
+    <div class="engine-head">
+      <span class="field-label">Read in parallel</span>
+      <span class="engine-note">Each one proves where it is before it's allowed to search.</span>
+    </div>
+    <ul class="engine-list">
+      <li><b>Google Maps</b><span>every venue, with coordinates</span></li>
+      <li><b>Eventbrite</b><span>dated, ticketed events</span></li>
+      <li><b>AllEvents</b><span>the long tail, and small towns</span></li>
+      <li><b>Groupon</b><span>what's discounted right now</span></li>
+      <li><b>TripAdvisor</b><span>consensus, and review counts</span></li>
+      <li><b>Time Out</b><span>a local's reason to go</span></li>
+    </ul>
+    <ul class="pitch">
+      <li>
+        <b>Local, and provably so</b>
+        A browser whose location silently failed returns perfectly valid
+        results for the wrong city. None of them search until the page itself
+        confirms the coordinates.
+      </li>
+      <li>
+        <b>You don't have to be there yet</b>
+        Put in a city you're moving to. The answers are that city's, not a
+        guess made from where you're sitting.
+      </li>
+      <li>
+        <b>It learns what you actually did</b>
+        Keep or skip anything and the next weekend in that town comes back
+        ranked differently.
+      </li>
+    </ul>
+  </section>
 
   <footer class="landing-foot"><span id="landingStats"></span></footer>
 </section>
@@ -163,17 +157,37 @@
 <!-- ══════════════════════════════════════════════════════════════ working -->
 <section class="screen screen--working" id="working">
   <div class="working-body">
-    <div class="status">
-      <span class="status-label">Searching from</span>
-      <span class="status-place" id="statusPlace">locating…</span>
-      <span class="status-sep" aria-hidden="true"></span>
-      <span class="status-coords" id="statusCoords">—</span>
-      <span class="status-ready"><b id="readyCount">0</b> of <span id="readyTotal">–</span> in position</span>
+    <!-- A dozen browsers reporting in from one set of coordinates is a radar
+         picture, so that is what the wait looks like. Each source is a blip
+         that lands when it answers; the middle counts what has come back. -->
+    <div class="dial-wrap">
+      <div class="dial" aria-hidden="true">
+        <span class="dial-ring dial-ring--1"></span>
+        <span class="dial-ring dial-ring--2"></span>
+        <span class="dial-ring dial-ring--3"></span>
+        <span class="dial-cross"></span>
+        <span class="dial-sweep"></span>
+        <span class="dial-core">
+          <b id="foundCount">0</b>
+          <em id="foundLabel">standing by</em>
+        </span>
+      </div>
+      <div class="blips" id="blips"></div>
     </div>
 
+    <p class="working-line" id="workingLine" role="status">Getting a fix on the place…</p>
+    <p class="working-where">
+      <span class="status-place" id="statusPlace">locating…</span>
+      <span class="status-coords" id="statusCoords">—</span>
+      <span class="status-ready"><b id="readyCount">0</b>/<span id="readyTotal">–</span> in position</span>
+    </p>
+
     <div class="terms" id="terms"></div>
-    <div class="lanes" id="lanes"></div>
     <p class="hint">Nothing searches until the page it opened confirms where it is.</p>
+
+    <!-- Still built, still timed — just not what you stare at while waiting.
+         The results page clones these as the record of how it went. -->
+    <div class="lanes" id="lanes" hidden></div>
   </div>
 </section>
 

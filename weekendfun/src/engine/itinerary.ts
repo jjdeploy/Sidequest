@@ -191,9 +191,17 @@ export function buildItinerary(
         // night" came back as bowling at ten in the morning again. Slots are
         // visited in order, so waiting costs nothing — the reservation fires
         // when the right hour comes round.
+        //
+        // Withholding the bonus is not enough on its own, which is how
+        // "bowling at night" came back as bowling at ten for the third time:
+        // in a small town the bowling alley is often also the best thing
+        // going at ten in the morning, so it won the slot on its own score
+        // before the evening came round. The wrong hours get an equal push
+        // the other way — held back, not banned, so an otherwise empty slot
+        // still takes it.
         if (owed.has(c.category)) {
           const rightTime = !timeOfDay || timeOfDay.toLowerCase() === slot.label.toLowerCase()
-          if (rightTime) fit += 60
+          fit += rightTime ? 60 : -60
         }
 
         // Keep the outdoor things off the wet day where we can.
