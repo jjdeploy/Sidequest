@@ -18,7 +18,7 @@ import type { PlanRequest, Weather } from "../types.js"
 import type { Scored } from "./score.js"
 import { explain } from "./score.js"
 import { milesBetween } from "../sources/util.js"
-import { eventDateOf } from "../sources/when.js"
+import { eventDateOf, eventPartOfDay } from "../sources/when.js"
 import { isWashout } from "../sources/weather.js"
 
 /** Slots are wall-clock shapes, not exact times — the sources rarely give us
@@ -144,6 +144,12 @@ export function buildItinerary(
         // weekend — and stay unconstrained.
         const happensOn = eventDateOf(c)
         if (happensOn !== null && happensOn !== date) continue
+
+        // ...and at the hour it happens. Same argument as the date: a listing
+        // that says 12:00 PM is not an evening plan, whatever category it
+        // falls into. Only applies when the listing published a time.
+        const startsIn = eventPartOfDay(c)
+        if (startsIn !== null && startsIn !== slot.label.toLowerCase()) continue
 
         // Cost is per person; a $40 ticket for a family of four is $160.
         const cost = (c.priceUsd ?? 0) * heads

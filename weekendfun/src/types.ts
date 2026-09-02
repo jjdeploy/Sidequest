@@ -114,6 +114,10 @@ export interface Candidate {
   scrapedAt: string
   /** Solari session that found it — the key to its rrweb replay. */
   sessionId?: string
+  /** Thumbnail the source rendered, when it rendered one. Only Google Maps
+   *  does, it is lazy-loaded so it is often absent, and the plan is designed
+   *  to look right without it. */
+  image?: string
 }
 
 export interface SourceResult {

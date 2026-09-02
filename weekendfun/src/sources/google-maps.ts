@@ -81,6 +81,13 @@ async function searchOne(page: Page, term: string, lat: number, lng: number) {
         // they had no reviews at all.
         const ratingEl = card.querySelector('span[role="img"][aria-label*="star"]')
 
+        // The card's thumbnail, when it has rendered one. Lazy-loaded, so the
+        // first few results usually have it and later ones often don't — the
+        // plan has to look right either way, which is why the fallback is a
+        // designed one rather than a broken image.
+        const img = card.querySelector("img") as HTMLImageElement | null
+        const imgSrc = img?.src?.startsWith("http") ? img.src : ""
+
         // Card text runs together as
         //   "<name><name> 4.6Tourist attraction ·  · 401 W Kennedy BlvdHome to..."
         // Two useful things fall out of that shape, both otherwise discarded:
@@ -103,6 +110,7 @@ async function searchOne(page: Page, term: string, lat: number, lng: number) {
           // "$10–20", "$$" — Maps is inconsistent, so hand the raw string to
           // the shared parser rather than guessing here.
           priceText: (text.match(/\$\d[\d–\-—\s.$]*|\$+(?=\s|$)/) ?? [""])[0],
+          imgSrc,
         }
       }),
     [PER_SEARCH, MAPS_TYPE_PATTERN] as [number, string],
@@ -166,6 +174,7 @@ export const googleMaps: SourceTask = {
               ratingRaw: r.ratingLabel,
               reviewsRaw: r.ratingLabel || r.text,
               address: r.address || undefined,
+              image: r.imgSrc || undefined,
               lat,
               lng,
               // Maps doesn't say indoor/outdoor. Leave it null and let the

@@ -149,6 +149,32 @@ export function parseEventWhen(raw: string, days: string[]): ParsedWhen | null {
   return null
 }
 
+/**
+ * Which part of the day an event actually starts in, or null when the
+ * listing didn't publish a time.
+ *
+ * We were parsing the time, storing it, and then choosing the slot by
+ * category anyway — so a sourdough class starting at 12:00 PM was scheduled
+ * for the evening. The Claude write-up caught it and said so in prose, which
+ * is twice now that the prose has noticed something the planner didn't.
+ *
+ * Midnight reads as "no time given": `parseEventWhen` defaults there when a
+ * listing publishes only a date, and a genuine midnight event is rarer than
+ * that case by a wide margin.
+ */
+export function eventPartOfDay(
+  c: { windows?: Array<{ start: string }> | null },
+): "morning" | "afternoon" | "evening" | null {
+  const start = c.windows?.[0]?.start
+  const time = start?.slice(11, 16)
+  if (!time || time === "00:00") return null
+  const minutes = Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5))
+  if (!Number.isFinite(minutes)) return null
+  if (minutes < 11 * 60 + 30) return "morning"
+  if (minutes < 16 * 60 + 30) return "afternoon"
+  return "evening"
+}
+
 /** The date an event is on, or null for anything not dated. */
 export function eventDateOf(c: { windows?: Array<{ start: string }> | null }): string | null {
   const start = c.windows?.[0]?.start

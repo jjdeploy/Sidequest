@@ -41,6 +41,29 @@ const money = (n) => (n === null ? null : n === 0 ? "free" : `$${Math.round(n)}`
 /** What each slot is called to someone reading a plan, not a schema. */
 const SLOT_TIME = { Morning: "10am", Afternoon: "2pm", Evening: "7pm" }
 
+/**
+ * What a stop looks like when the source gave us no photograph.
+ *
+ * Only Google Maps renders a thumbnail, and it lazy-loads them, so roughly a
+ * third of a plan has no image. A broken frame or an empty grey box would
+ * undo the whole point of the layout, so the fallback is designed: the
+ * category's own colour and a single glyph. It reads as intentional rather
+ * than as a hole where a picture should be.
+ */
+const CATEGORY_ART = {
+  food:      ["🍽", "#ffb703", "#f4552c"],
+  drink:     ["🍸", "#ff8fa3", "#c9184a"],
+  outdoors:  ["🌿", "#5cc98e", "#0d9488"],
+  culture:   ["🏛", "#9d8cff", "#5b45c9"],
+  music:     ["🎧", "#ff8fa3", "#7a5cff"],
+  nightlife: ["🌙", "#7a86ff", "#2f2a7a"],
+  active:    ["🎳", "#2ec4b6", "#0b7d70"],
+  family:    ["🎡", "#ffc857", "#ff6a45"],
+  shopping:  ["🛍", "#ffa8bf", "#e0457b"],
+  event:     ["🎪", "#ff9f1c", "#f4552c"],
+  other:     ["📍", "#c2b2a3", "#8a7768"],
+}
+
 /** Category labels in the user's words, not the enum's. */
 const CATEGORY_LABEL = {
   food: "food", drink: "drinks", outdoors: "outdoors", culture: "culture",
@@ -408,30 +431,39 @@ function renderPlan(it) {
 
   it.days.forEach((day, dayIdx) => {
     const date = new Date(`${day.date}T12:00:00`)
-    const name = date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })
+    const dow = date.toLocaleDateString(undefined, { weekday: "long" })
+    const dateLine = date.toLocaleDateString(undefined, { month: "long", day: "numeric" })
     const w = day.weather
-    const wet = w ? w.precipChance >= 60 : false
+    const wet = w ? w.precipChance >= 50 : false
 
-    const slots = el("div", {})
+    const stops = el("div", { class: "stops" })
     for (const item of day.items) {
       pin++
       const c = item.candidate
       if (c.lat !== null && c.lng !== null) pins.push({ ...c, pin, day: dayIdx, slot: item.slot })
-      slots.append(renderSlot(item, pin))
+      stops.append(renderStop(item))
     }
     if (day.items.length === 0) {
-      slots.append(el("p", { class: "slot-why", style: "padding:16px 0" },
+      stops.append(el("p", { class: "stop-empty" },
         "Nothing here fit. Try a different mood, or a bigger budget."))
     }
 
-    host.append(el("section", {}, [
+    host.append(el("section", { class: `day ${wet ? "day--wet" : ""}` }, [
       el("div", { class: "day-head" }, [
-        el("span", { class: "day-name" }, name),
-        w ? el("span", { class: `day-wx ${wet ? "wet" : ""}` },
-          `${w.highF}° · ${w.summary} · ${w.precipChance}% rain`) : null,
-        day.costUsd > 0 ? el("span", { class: "day-cost" }, `$${Math.round(day.costUsd)}`) : null,
+        el("div", { class: "day-when" }, [
+          el("div", { class: "day-dow" }, dow),
+          el("div", { class: "day-date" }, dateLine),
+        ]),
+        w
+          ? el("div", { class: "day-wx" }, [
+              el("span", { class: "day-temp" }, `${w.highF}°`),
+              el("span", { class: "day-sky" }, w.summary),
+              el("span", {}, `${w.precipChance}% rain`),
+            ])
+          : null,
+        day.costUsd > 0 ? el("div", { class: "day-spend" }, `${Math.round(day.costUsd)}`) : null,
       ]),
-      slots,
+      stops,
     ]))
   })
 
@@ -446,7 +478,27 @@ function renderPlan(it) {
   renderMap(pins)
 }
 
-function renderSlot(item, pin) {
+/** The thumbnail: the source's photograph, or the category's own colour. */
+function renderThumb(c) {
+  const [glyph, from, to] = CATEGORY_ART[c.category] ?? CATEGORY_ART.other
+  const box = el("div", {
+    class: "stop-thumb",
+    style: `background:linear-gradient(150deg,${from},${to})`,
+  })
+  if (c.image) {
+    box.append(el("img", {
+      src: c.image, alt: "", loading: "lazy", referrerPolicy: "no-referrer",
+      // A dead thumbnail falls back to the gradient underneath rather than
+      // leaving a broken frame in the middle of the plan.
+      onerror: (e) => e.currentTarget.remove(),
+    }))
+  } else {
+    box.append(el("span", { "aria-hidden": "true" }, glyph))
+  }
+  return box
+}
+
+function renderStop(item) {
   const c = item.candidate
   const price = money(c.priceUsd)
 
@@ -467,13 +519,17 @@ function renderSlot(item, pin) {
     item.hopMiles !== null ? el("span", { class: "tag tag--far" }, `${item.hopMiles.toFixed(1)} mi away`) : null,
   ])
 
-  return el("div", { class: "slot" }, [
-    el("div", { class: "slot-when" }, [el("b", {}, SLOT_TIME[item.slot] ?? ""), item.slot]),
-    el("div", {}, [
-      el("div", { class: "slot-title" },
+  return el("div", { class: "stop" }, [
+    el("div", { class: "stop-time" }, [
+      el("div", { class: "stop-hour" }, SLOT_TIME[item.slot] ?? ""),
+      el("div", { class: "stop-part" }, item.slot),
+    ]),
+    renderThumb(c),
+    el("div", { class: "stop-body" }, [
+      el("div", { class: "stop-title" },
         c.url ? el("a", { href: c.url, target: "_blank", rel: "noreferrer" }, c.title) : c.title),
       facts,
-      el("div", { class: "slot-why" }, item.why),
+      el("div", { class: "stop-why" }, item.why),
       state.explain ? renderComponents(c.components) : null,
       renderActs(c),
     ]),
@@ -526,7 +582,8 @@ function renderActs(c) {
 
 function renderCatalogue() {
   const rest = state.catalogue.filter((c) => !state.planned.has(c.id))
-  $("catCount").textContent = `${rest.length} more in ${state.place?.city ?? "town"}`
+  $("catCount").textContent =
+    `${rest.length} more places we found in ${state.place?.city ?? "town"}`
 
   const byCat = new Map()
   for (const c of rest) {

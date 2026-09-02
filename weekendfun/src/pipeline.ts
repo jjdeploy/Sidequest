@@ -196,6 +196,7 @@ export interface RankedView {
   lng: number | null
   address: string | null
   evidence: string
+  image: string | null
   corroboration: number
   score: number
   components: Array<{ name: string; points: number; why: string }>
@@ -229,6 +230,7 @@ function toView(s: Scored): RankedView {
     lng: c.lng ?? null,
     address: c.address ?? null,
     evidence: c.evidence,
+    image: c.image ?? null,
     corroboration: s.corroboration,
     score: s.score,
     components: s.components,

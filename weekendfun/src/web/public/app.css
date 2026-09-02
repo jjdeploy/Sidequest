@@ -335,30 +335,84 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 }
 .eyebrow em { font-style: normal; margin-left: auto; letter-spacing: .06em; text-transform: none; }
 
-/* ── the plan ── */
+/* ── the plan ──────────────────────────────────────────────────────────
+ *
+ * The one thing on this page anybody came for, so it gets the weight: a day
+ * is a card with its own weather-tinted sky, and the three stops hang off a
+ * timeline down its left edge. Every other section on the page is quieter
+ * than this one on purpose.
+ */
 .days { display: flex; flex-direction: column; gap: var(--s6); }
-.day-head { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s3); }
-.day-name { font-family: var(--display); font-weight: 700; font-size: 21px; letter-spacing: -0.03em; }
-.day-wx { font: 400 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
-.day-wx.wet { color: var(--sea); }
-.day-cost { margin-left: auto; font: 400 12px var(--mono); color: var(--faint); }
 
-.slot {
-  display: grid; grid-template-columns: 84px minmax(0,1fr);
-  gap: var(--s4); padding: var(--s4); margin-bottom: var(--s2);
-  background: var(--card); border: 1px solid var(--rule);
-  border-radius: var(--r-lg); box-shadow: var(--shadow);
-  transition: box-shadow .16s, border-color .16s;
+.day {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--shadow-lift);
 }
-.slot:hover { box-shadow: var(--shadow-lift); border-color: var(--rule-2); }
-.slot-when { font: 500 10.5px var(--mono); text-transform: uppercase; letter-spacing: .12em; color: var(--faint); padding-top: 3px; }
-.slot-when b { display: block; font-size: 19px; letter-spacing: -0.02em; color: var(--coral); font-weight: 600; margin-bottom: 2px; }
 
-.slot-title { font-family: var(--display); font-weight: 700; font-size: 18.5px; letter-spacing: -0.03em; line-height: 1.2; }
-.slot-title a { text-decoration: none; }
-.slot-title a:hover { text-decoration: underline; text-decoration-color: var(--coral); text-underline-offset: 3px; }
-.facts { display: flex; flex-wrap: wrap; gap: var(--s1); margin: var(--s2) 0; align-items: center; }
-.slot-why { color: var(--muted); font-size: 14px; max-width: 68ch; }
+/* The sky. Tinted by the forecast, which is the one piece of a weekend plan
+   that changes how the whole day feels. */
+.day-head {
+  position: relative;
+  padding: var(--s5) var(--s5) var(--s4);
+  border-bottom: 1px solid var(--rule);
+  display: flex; align-items: flex-end; gap: var(--s4); flex-wrap: wrap;
+  background: linear-gradient(160deg, #ffe9c9, #fff6ec 70%);
+}
+.day--wet .day-head { background: linear-gradient(160deg, #d9ecf2, #f4fafc 70%); }
+.day-when { min-width: 0; }
+.day-dow {
+  font-family: var(--display); font-weight: 800;
+  font-size: clamp(26px, 3.4vw, 38px); letter-spacing: -0.04em; line-height: 1;
+}
+.day-date { font: 500 12px var(--mono); color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-top: var(--s2); }
+.day-wx {
+  margin-left: auto; display: flex; align-items: center; gap: var(--s3);
+  font: 400 12.5px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.day-temp { font-family: var(--display); font-weight: 700; font-size: 26px; letter-spacing: -0.03em; color: var(--ink); }
+.day-sky { text-transform: capitalize; }
+.day-spend { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+
+/* The timeline. One rule down the left, the stops hanging off it. */
+.stops { position: relative; padding: var(--s5) var(--s5) var(--s5) 0; margin-left: 92px; }
+.stops::before {
+  content: ""; position: absolute; left: -46px; top: 34px; bottom: 34px;
+  width: 2px; background: linear-gradient(var(--rule-2), var(--rule));
+}
+
+.stop { position: relative; display: flex; gap: var(--s4); padding: var(--s4) 0; }
+.stop + .stop { border-top: 1px solid var(--rule); }
+
+.stop-time {
+  position: absolute; left: -92px; top: var(--s4); width: 92px;
+  text-align: right; padding-right: var(--s5);
+}
+.stop-hour { font-family: var(--display); font-weight: 700; font-size: 19px; letter-spacing: -0.03em; color: var(--coral); }
+.stop-part { font: 500 9.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); margin-top: 1px; }
+/* The dot on the line. */
+.stop-time::after {
+  content: ""; position: absolute; right: -7px; top: 7px;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--coral); border: 3px solid var(--card);
+}
+
+.stop-thumb {
+  flex: none; width: 108px; height: 108px; border-radius: 14px; overflow: hidden;
+  display: grid; place-items: center; font-size: 34px; line-height: 1;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.05);
+}
+.stop-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.stop-body { min-width: 0; flex: 1; }
+.stop-title { font-family: var(--display); font-weight: 700; font-size: 21px; letter-spacing: -0.03em; line-height: 1.15; }
+.stop-title a { text-decoration: none; }
+.stop-title a:hover { text-decoration: underline; text-decoration-color: var(--coral); text-underline-offset: 3px; }
+.stop-why { color: var(--muted); font-size: 14px; margin-top: var(--s2); max-width: 62ch; }
+
+.facts { display: flex; flex-wrap: wrap; gap: var(--s1); margin-top: var(--s2); align-items: center; }
 
 .tag {
   font: 400 11.5px var(--mono); padding: 3px 8px; border-radius: var(--r-sm);
@@ -390,7 +444,13 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 .components .pts.pos { color: #0b7d70; }
 .components .pts.neg { color: var(--red); }
 
-.plan-foot { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s5); align-items: baseline; margin-top: var(--s5); font-size: 14px; color: var(--muted); }
+.stop-empty { padding: var(--s5) 0; color: var(--muted); font-size: 14px; }
+
+.plan-foot {
+  display: flex; flex-wrap: wrap; gap: var(--s2) var(--s5); align-items: baseline;
+  margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--rule);
+  font-size: 14px; color: var(--muted);
+}
 .plan-total { font-family: var(--display); font-weight: 700; font-size: 26px; color: var(--ink); letter-spacing: -0.04em; }
 .plan-note { flex-basis: 100%; color: var(--faint); font-size: 13px; }
 
@@ -526,3 +586,21 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 @media (prefers-reduced-motion: reduce) {
   *, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }
+
+/* ── everything else, folded away ─────────────────────────────────────────
+ * The plan is the answer. This is the evidence behind it and the rest of the
+ * town, and it should read as a door rather than a second answer.
+ */
+.more-block { border-top: 1px solid var(--rule); padding-top: var(--s5); }
+.more-block > summary {
+  cursor: pointer; list-style: none;
+  display: flex; align-items: baseline; gap: var(--s3);
+  font-family: var(--display); font-weight: 700; font-size: 19px; letter-spacing: -0.03em;
+}
+.more-block > summary::-webkit-details-marker { display: none; }
+.more-block > summary em { font-style: normal; font: 400 13px var(--body); color: var(--muted); }
+.more-block > summary .chev { margin-left: auto; color: var(--coral); font-size: 13.5px; font-weight: 600; font-family: var(--body); }
+.more-block > summary .chev::after { content: " ›"; }
+.more-block[open] > summary .chev::after { content: " ⌄"; }
+.more-block[open] > summary { margin-bottom: var(--s5); }
+.more-body { display: flex; flex-direction: column; gap: var(--s6); }

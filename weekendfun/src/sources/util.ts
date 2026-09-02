@@ -253,6 +253,7 @@ export interface BuildArgs {
   lng?: number
   windows?: Candidate["windows"]
   indoor?: boolean | null
+  image?: string
 }
 
 /** One place that builds a Candidate, so every source produces the same shape. */
@@ -277,6 +278,7 @@ export function buildCandidate(a: BuildArgs): Candidate {
     lng: a.lng,
     windows: a.windows ?? null,
     indoor: a.indoor ?? null,
+    image: a.image,
     evidence: snippet(cleanField(a.evidence) ?? a.evidence),
     scrapedAt: new Date().toISOString(),
   }

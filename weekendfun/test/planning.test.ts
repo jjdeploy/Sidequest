@@ -11,6 +11,7 @@ import { buildItinerary } from "../src/engine/itinerary.js"
 import { rank } from "../src/engine/score.js"
 import { candidate, request, scored, WEEKEND } from "./helpers.js"
 import type { Category } from "../src/types.js"
+import { eventPartOfDay } from "../src/sources/when.js"
 
 const terms = (req: Parameters<typeof buildKeywords>[0]) => buildKeywords(req, 8).map((k) => k.term)
 
@@ -379,5 +380,55 @@ describe("a time phrase is a time, not a mood", () => {
     const it = buildItinerary([lanes, ...filler], request({ timeOfDay: when }), [], asked, when)
     const slot = it.days.flatMap((d) => d.items).find((i) => i.scored.candidate.id === "lanes")?.slot
     assert.equal(slot, "Evening")
+  })
+})
+
+describe("an event goes in the slot it actually starts in", () => {
+  // We parsed the start time, stored it, and then picked the slot by category
+  // anyway — so a sourdough class starting at 12:00 PM was scheduled for the
+  // evening. The Claude write-up spotted it and said so in prose, which is
+  // the second time the prose has noticed something the planner hadn't.
+  test("eventPartOfDay reads the hour", () => {
+    const at = (t: string) => eventPartOfDay({ windows: [{ start: `2026-09-05T${t}` }] })
+    assert.equal(at("09:00"), "morning")
+    assert.equal(at("11:29"), "morning")
+    assert.equal(at("12:00"), "afternoon")
+    assert.equal(at("16:29"), "afternoon")
+    assert.equal(at("17:00"), "evening")
+    assert.equal(at("21:30"), "evening")
+  })
+
+  test("midnight means the listing gave no time, not an event at midnight", () => {
+    // parseEventWhen defaults there when only a date was published.
+    assert.equal(eventPartOfDay({ windows: [{ start: "2026-09-05T00:00" }] }), null)
+    assert.equal(eventPartOfDay({ windows: null }), null)
+  })
+
+  test("a noon class never lands in the evening slot", () => {
+    const noon = scored(
+      candidate({ id: "class", category: "event", windows: [{ start: `${WEEKEND[0]}T12:00` }] }),
+      500,
+    )
+    const it = buildItinerary([noon], request(), [])
+    const placed = it.days.flatMap((d) => d.items).find((i) => i.scored.candidate.id === "class")
+    assert.equal(placed?.slot, "Afternoon")
+  })
+
+  test("an evening gig never lands in the morning slot", () => {
+    const gig = scored(
+      candidate({ id: "gig", category: "music", windows: [{ start: `${WEEKEND[0]}T21:00` }] }),
+      500,
+    )
+    const it = buildItinerary([gig], request(), [])
+    assert.equal(
+      it.days.flatMap((d) => d.items).find((i) => i.scored.candidate.id === "gig")?.slot,
+      "Evening",
+    )
+  })
+
+  test("a venue with no published time is still free to go anywhere", () => {
+    const venue = scored(candidate({ id: "park", category: "outdoors" }), 500)
+    const it = buildItinerary([venue], request(), [])
+    assert.equal(it.days.flatMap((d) => d.items).length, 1)
   })
 })
