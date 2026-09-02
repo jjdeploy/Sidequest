@@ -54,7 +54,7 @@ Public surfaces only:
 - Google Trends
 
 Login-gated, leave alone: Instagram Explore, X. Reddit already has an official
-API and blocks everything else — see `weekendfun/src/sources/reddit.ts`.
+API and blocks everything else — see `sidequest/src/sources/reddit.ts`.
 
 ## The honest constraints
 

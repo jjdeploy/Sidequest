@@ -104,3 +104,19 @@ Back to the landing page, flip **21+**, note the caption changing.
   out loud.
 - **A plan looks thin.** Palm Coast genuinely is thin. Say the number of
   candidates that survived screening rather than pretending.
+
+## Retaking the screenshots
+
+The three images in this folder are what a reader sees before they read a
+word, so they have to match what the app currently looks like. Retake all
+three whenever the UI changes:
+
+| File | Shot |
+|---|---|
+| `landing.jpg` | The landing page, nothing typed, 21+ switch visible. |
+| `fanout.jpg` | Mid-run: the ring part-filled, source pips landing, the "in position" count climbing. |
+| `plan.jpg` | The finished plan — the timeline, and enough of the catalogue below it to show there is more. |
+
+Browser at 1440×900, bookmarks hidden, zoom 100%, and crop out the OS chrome.
+Then drop them in over the top of the existing files — both READMEs reference
+these exact names.

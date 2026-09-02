@@ -7,6 +7,5 @@ __pycache__/
 venv/
 screenshot.png
 
-# WeekendFun learning store
-weekendfun/data/
+# The learning store and everything scraped into it.
 data/

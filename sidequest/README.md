@@ -54,6 +54,10 @@ plan every time, so a rehearsed take matches the real one.
 
 ![The landing page](docs/landing.jpg)
 
+<!-- Demo video: paste the link here once recorded. docs/demo-script.md has
+     the shot list; the run is deterministic so a rehearsed take matches. -->
+**▶ [Three-minute demo](#)** — *link to be added*
+
 ## How Solari is used
 
 Every browser in the fan-out is a Solari session. Five of the SDK's
@@ -521,7 +525,7 @@ signal actually undoes it.
 ## Tests, and what they're for
 
 ```bash
-npm test        # 109 tests, no dependencies, ~1s
+npm test        # 252 tests, no dependencies, ~1s
 ```
 
 `node --test` with `tsx`, so there's no framework and nothing new to install.
@@ -568,7 +572,7 @@ point is to see it.
 
 ```bash
 npm run dashboard                     the browser UI — start here
-npm test                              109 tests, no dependencies
+npm test                              252 tests, no dependencies
 npm run plan -- "Tampa, FL"
 npm run plan -- "Seattle, WA" -- --vibes "outdoorsy, cheap" --budget 150
 npm run plan -- "Austin, TX" -- --ask "date night, no driving, under $100"
@@ -695,6 +699,7 @@ src/
   engine/score.ts     deterministic ranking with named components
   engine/itinerary.ts ranked list -> an actual schedule
   engine/learn.ts     signals -> taste vector
+  sources/util.ts     one candidate shape, and the source's own type descriptor
   sources/when.ts     the four date formats event sites actually publish
   sources/text.ts     entity decoding and truncation chrome, in one place
   store/db.ts         node:sqlite, no native modules
