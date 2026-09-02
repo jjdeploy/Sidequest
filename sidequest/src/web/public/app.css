@@ -637,6 +637,16 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 .plan-total { font-family: var(--display); font-weight: 700; font-size: 26px; color: var(--ink); letter-spacing: -0.04em; }
 .plan-note { flex-basis: 100%; color: var(--faint); font-size: 13px; }
 
+/* An unmet request. Coloured like the form error rather than like a note,
+   because it is an answer to something they asked and the answer is no. */
+.unmet {
+  margin: 0 0 var(--s5); padding: var(--s3) var(--s4);
+  border-radius: var(--r-md); border: 1px solid #ffd9c9;
+  background: #fff6f1; color: #8a3d1e; font-size: 14px; line-height: 1.5;
+}
+.unmet b { font-weight: 700; }
+.unmet div + div { margin-top: 4px; }
+
 /* ── map ── */
 .map { position: relative; height: 360px; border-radius: var(--r-lg); overflow: hidden; background: var(--sand); border: 1px solid var(--rule); box-shadow: var(--shadow); }
 /* Tiles as-is. The dark build needed inverting; on cream, OSM's own palette is

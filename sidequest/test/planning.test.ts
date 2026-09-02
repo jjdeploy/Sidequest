@@ -380,6 +380,10 @@ describe("a time phrase is a time, not a mood", () => {
     assert.equal(stripTimeWords("drinks at 9pm"), "drinks at")
     assert.equal(stripTimeWords("bowling"), "bowling", "nothing to strip")
     assert.equal(stripTimeWords("somewhere on the water"), "somewhere on the water")
+    // Two requests in one sentence. Taking "night" out of "the other night"
+    // left "bowling , clubbing the other" sitting in the hint under the
+    // search box, which reads like the parser gave up halfway.
+    assert.equal(stripTimeWords("bowling at night, clubbing the other night"), "bowling, clubbing")
   })
 
   test('"bowling at night" asks for bowling, not for nightlife', () => {
@@ -591,5 +595,87 @@ describe("two things asked for, two nights", () => {
       daytime.some((id) => id.startsWith("w-")),
       `every asked-for category was held out of the daytime: ${daytime.join(", ")}`,
     )
+  })
+})
+
+describe("a request outranks source balance", () => {
+  test("the one bowling alley in town still gets its night", () => {
+    // Asheville, "bowling at night": Sky Lanes Bowling scored 4.75 and had
+    // the +60 reservation, and still lost the Sunday evening to New Belgium
+    // Brewing at 30.4. Google Maps had taken three slots by then, so the
+    // per-source diminishing return charged the bowling alley -27 and the
+    // brewery, found by a source that had won nothing yet, zero.
+    //
+    // Source balance exists so Maps cannot take all six slots. It is not a
+    // reason to drop the one thing somebody typed the name of.
+    const bowling = scored(candidate({ id: "lanes", source: "google-maps", category: "active" }), 4.75)
+    const brewery = scored(candidate({ id: "brew", source: "tripadvisor", category: "drink" }), 30)
+    const mapsFill = Array.from({ length: 4 }, (_, i) =>
+      scored(candidate({ id: `m-${i}`, source: "google-maps", category: i % 2 ? "culture" : "outdoors" }), 29 - i))
+
+    const it = buildItinerary(
+      [brewery, ...mapsFill, bowling],
+      request({ days: [WEEKEND[0]!], party: { adults: 2, kids: 0, over21: true } }),
+      [], new Set(["active"]), "evening",
+    )
+
+    const evening = it.days[0]!.items.find((i) => i.slot === "Evening")
+    assert.equal(evening?.scored.candidate.id, "lanes")
+  })
+})
+
+describe("what you typed is a requirement, not a preference", () => {
+  const both = [{ term: "bowling", category: "active" as const }, { term: "dance clubs", category: "nightlife" as const }]
+
+  test("bowling at night and a club at night get both nights", () => {
+    // Not "scores higher". Booked. The two evenings are claimed before the
+    // rest of the weekend is filled in around them.
+    const lanes = scored(candidate({ id: "lanes", title: "Sky Lanes Bowling", category: "active" }), 4)
+    const club = scored(candidate({ id: "club", title: "Club Prana", category: "nightlife" }), 4)
+    const heavies = Array.from({ length: 12 }, (_, i) =>
+      scored(candidate({ id: `h-${i}`, category: i % 2 ? "food" : "music", rating: 4.9, reviewCount: 9000 }), 60 - i))
+
+    const it = buildItinerary([...heavies, lanes, club], request(), [], new Set(), "evening", both)
+    const evenings = it.days.flatMap((d) => d.items).filter((i) => i.slot === "Evening")
+      .map((i) => i.scored.candidate.id).sort()
+    assert.deepEqual(evenings, ["club", "lanes"])
+    assert.equal(it.unmet.length, 0)
+  })
+
+  test("the word wins inside its own category", () => {
+    const pinball = scored(candidate({ id: "pin", title: "Asheville Pinball Museum", category: "active" }), 25)
+    const lanes = scored(candidate({ id: "lanes", title: "Sky Lanes Bowling", category: "active" }), 4)
+    const it = buildItinerary([pinball, lanes], request({ days: [WEEKEND[0]!] }), [], new Set(), "evening",
+      [{ term: "bowling", category: "active" }])
+    assert.equal(it.days[0]!.items.find((i) => i.slot === "Evening")?.scored.candidate.id, "lanes")
+  })
+
+  test("...and the category carries it when nothing matches the word", () => {
+    const pinball = scored(candidate({ id: "pin", title: "Asheville Pinball Museum", category: "active" }), 4)
+    const dinner = scored(candidate({ id: "food", title: "Curate", category: "food" }), 40)
+    const it = buildItinerary([dinner, pinball], request({ days: [WEEKEND[0]!] }), [], new Set(), "evening",
+      [{ term: "bowling", category: "active" }])
+    assert.equal(it.days[0]!.items.find((i) => i.slot === "Evening")?.scored.candidate.id, "pin")
+  })
+
+  test("when the town has neither, the plan says so in its own words", () => {
+    // The point of a requirement is that failing it is news. A weekend that
+    // quietly leaves out the one thing you asked for looks like the town is
+    // empty rather than like the search came up short.
+    const filler = Array.from({ length: 8 }, (_, i) =>
+      scored(candidate({ id: `f-${i}`, category: i % 2 ? "food" : "culture" }), 30 - i))
+    const it = buildItinerary(filler, request(), [], new Set(), "evening", both)
+    assert.equal(it.unmet.length, 2, JSON.stringify(it.unmet))
+    assert.match(it.unmet.join(" "), /bowling/)
+    assert.match(it.unmet.join(" "), /club/i)
+  })
+
+  test("more requests than nights is also news", () => {
+    const one = [{ term: "bowling", category: "active" as const }, { term: "dance clubs", category: "nightlife" as const }]
+    const lanes = scored(candidate({ id: "lanes", title: "Sky Lanes Bowling", category: "active" }), 4)
+    const club = scored(candidate({ id: "club", title: "Club Prana", category: "nightlife" }), 4)
+    const it = buildItinerary([lanes, club], request({ days: [WEEKEND[0]!] }), [], new Set(), "evening", one)
+    assert.equal(it.unmet.length, 1, JSON.stringify(it.unmet))
+    assert.match(it.unmet[0]!, /evening/i)
   })
 })

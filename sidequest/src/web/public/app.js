@@ -622,6 +622,13 @@ function renderPlan(it) {
     ? `read as: ${state.askNote}`
     : state.place ? state.place.label : ""
 
+  // What they asked for and did not get, said before the plan rather than
+  // after it.
+  const gap = $("planUnmet")
+  clear(gap)
+  gap.hidden = !it.unmet?.length
+  for (const line of it.unmet ?? []) gap.append(el("div", {}, line))
+
   let pin = 0
   const pins = []
 

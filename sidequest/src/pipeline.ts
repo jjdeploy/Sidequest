@@ -229,6 +229,8 @@ export interface ItineraryView {
   totalUsd: number
   budgetUsd: number
   notes: string[]
+  /** What they asked for by name that the plan could not book, and why. */
+  unmet: string[]
 }
 
 function toView(s: Scored): RankedView {
@@ -270,6 +272,7 @@ function itineraryView(it: Itinerary, budgetUsd: number): ItineraryView {
     totalUsd: it.totalUsd,
     budgetUsd,
     notes: it.notes,
+    unmet: it.unmet,
   }
 }
 
@@ -468,7 +471,12 @@ export async function runPlan(
   emit({ type: "ranked", top: ranked.map(toView) })
 
   // 5. Assemble.
-  const itinerary = buildItinerary(ranked, req, weather, ctx.requested, req.timeOfDay)
+  // The terms they typed the words for themselves become bookings rather
+  // than preferences — see engine/itinerary.ts.
+  const required = keywords
+    .filter((k) => k.said)
+    .map((k) => ({ term: k.term, category: k.category }))
+  const itinerary = buildItinerary(ranked, req, weather, ctx.requested, req.timeOfDay, required)
   const planId = randomUUID()
   store.savePlan(planId, runId, `${req.place.label} ${req.days[0]}`, itinerary.days)
   emit({ type: "itinerary", planId, runId, itinerary: itineraryView(itinerary, req.budgetUsd) })

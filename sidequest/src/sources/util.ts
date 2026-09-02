@@ -157,6 +157,14 @@ export function isJunkEvent(title: string, evidence = ""): boolean {
     return true
   }
 
+  // A discount is not a thing to do.
+  //
+  // Groupon prints the offer where the venue name goes on some cards, so
+  // "10% Cashback" reached a real plan as a Sunday morning. Anchored to the
+  // TITLE, not the evidence — half the listings on that site mention a
+  // percentage off somewhere in the blurb and they are still real places.
+  if (/^\s*(?:up to\s*)?[$]?\d+%?\s*(?:%\s*)?(?:off|cash ?back)\b/i.test(title)) return true
+
   // Sales pitches wearing a party hat.
   if (/\b(free consultation|info(?:rmational)? session|open house|orientation|demo day)\b/.test(s)) return true
 

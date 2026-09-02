@@ -132,17 +132,23 @@ const ASKED_FOR = 0.75
  */
 
 /**
- * Did they write this term, near enough?
+ * Does this text contain the term, near enough?
  *
  * Crude stemming on purpose. "clubbing" has to reach the term "dance clubs"
  * and "bowling" has to reach "bowling", and nothing subtler than a common
  * prefix is needed for that. The four-character floor keeps "bar" out of
  * "barbecue" and stops two-letter words matching everything.
+ *
+ * Asked twice of every term, of two different texts: did the user write it,
+ * and does this candidate answer it. engine/itinerary.ts asks the second —
+ * a reservation made for the word "bowling" should be spent on a bowling
+ * alley, not on whatever else in town happens to be filed under `active`.
  */
-function wasTyped(term: string, said: string): boolean {
+export function mentions(term: string, text: string): boolean {
+  const hay = text.toLowerCase()
   return term.toLowerCase().split(/\s+/).some((w) => {
     const stem = w.replace(/(?:ies|ing|es|s)$/, "")
-    return stem.length >= 4 && said.includes(stem)
+    return stem.length >= 4 && hay.includes(stem)
   })
 }
 
@@ -202,6 +208,12 @@ export function stripTimeWords(text: string): string {
     // ...and the bare word on its own.
     .replace(/\b(?:night|nights|tonight|evening|evenings|morning|mornings|afternoon|afternoons|midday|sunrise|after dark)\b/gi, " ")
     .replace(/\b\d{1,2}\s*(?:am|pm)\b/gi, " ")
+    // What the removal leaves behind. "clubbing the other night" becomes
+    // "clubbing the other", which reads like the parser gave up halfway and
+    // is shown to the user verbatim in the hint under the search box.
+    .replace(/\b(?:the\s+)?other\b(?=\s*[,.]|\s*$)/gi, " ")
+    .replace(/\s+([,.])/g, "$1")
+    .replace(/[\s,]+$/, "")
     .replace(/\s+/g, " ")
     .trim()
 }
@@ -338,7 +350,7 @@ export function buildKeywords(req: PlanRequest, limit = 8): Keyword[] {
   // matters is whether the finished term is one they said.
   const said = req.vibes.join(" ").toLowerCase()
   for (const k of out.values()) {
-    if (wasTyped(k.term, said)) k.said = true
+    if (mentions(k.term, said)) k.said = true
   }
 
   const avoid = req.avoid.map((a) => a.toLowerCase()).filter(Boolean)

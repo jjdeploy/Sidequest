@@ -175,6 +175,20 @@ describe("isJunkEvent", () => {
   for (const title of fine) test(`keeps "${title}"`, () => assert.equal(isJunkEvent(title), false))
 })
 
+describe("isJunkEvent: a discount is not a thing to do", () => {
+  test("a Groupon promo line is not a Sunday morning", () => {
+    // "10% Cashback" was scheduled as the Sunday morning of a real plan.
+    // Groupon prints the offer where the venue name goes on some cards.
+    assert.equal(isJunkEvent("10% Cashback"), true)
+    assert.equal(isJunkEvent("Up to 50% Off"), true)
+    assert.equal(isJunkEvent("$25 Cash Back at Solid Grill & Bar"), true)
+  })
+
+  test("a real venue that mentions a discount is not junk", () => {
+    assert.equal(isJunkEvent("Sky Lanes Bowling", "Two games for $18, 20% off before noon"), false)
+  })
+})
+
 describe("text hygiene", () => {
   test("decodes double-encoded entities", () => {
     assert.equal(decodeEntities("Fish &amp;amp; Chips"), "Fish & Chips")

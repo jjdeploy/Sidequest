@@ -309,6 +309,69 @@ Read your request as: bowling · in the evening · $300 · car
   Evening    Palm Coast Lanes
 ```
 
+### Two requests in one sentence
+
+"bowling at night, clubbing the other night" came back with an ale lounge one
+night and no bowling at all — the same symptom, three more causes, each of
+which had looked like a good idea on its own.
+
+**The expansion was mistaken for the request.** One typed word becomes a
+family of searches, which is exactly right for searching: a town might call
+its one club a cocktail bar, a live music venue or a brewery, so ask for all
+of them. It is not right for reserving. Five categories ended up owed an
+evening, two evenings existed, an inferred cocktail bar won one of them, and
+the bowling that had actually been typed lost. So the terms now carry a
+`said` flag — set when the user wrote the word themselves — and only those
+reserve. It is a flag rather than a high weight because weight already
+carries a corroboration bump that takes 0.85 to 1.00 and sailed straight over
+the numeric tier this replaced.
+
+**A reservation nothing can honour is just a ban.** The reservation has two
+halves: a bonus in the right slot, and an equal push out of the wrong ones to
+keep the category free until its hour comes. The second half is only
+defensible while the hour is still coming — the three categories that lost
+the auction were still being held out of all four daytime slots for an
+evening they were never going to get, so they left the plan entirely. There
+are now never more reservations than there are slots to honour them in.
+
+**Source balance was outbidding the request.** With that fixed, Sky Lanes
+Bowling still lost the Sunday evening: it scored 4.75, it had the +60, and
+Google Maps had won three slots by then — so the per-source diminishing
+return charged the town's only bowling alley −27 while charging a brewery
+found by an idle source nothing. Balance exists so Maps cannot take all six
+slots. It is not a reason to drop the one thing somebody typed the name of,
+so it is waived for a category that is still owed.
+
+**And then the category honoured the letter and not the spirit.** The next
+run put the Asheville Pinball Museum in the evening. Pinball is `active` and
+so is bowling, and a museum with hundreds of reviews beats an alley with
+none.
+
+### So the slot is booked, not bid for
+
+Four fixes to the same mechanism, each of which held for one shape of request
+and broke on the next, is a mechanism in the wrong place. A typed request is
+not a preference to be scored — it is a booking.
+
+`buildItinerary` now runs a booking pass before the auction. Each term the
+user wrote the word for claims a slot at the hour they asked for, matched on
+the word first and the category second, and obeying exactly the same hard
+constraints as the auction — a requirement that books a Saturday event into
+Sunday would be worse than one that failed. Then the auction fills in around
+what is already booked.
+
+And what could not be booked is said out loud, above the plan rather than in
+a footnote under it:
+
+```
+You asked for bowling in the evening — nothing in Asheville matched.
+You asked for dance clubs in the evening — the weekend ran out of evenings
+before it got there.
+```
+
+A weekend that quietly leaves out the thing you typed reads as an empty town
+rather than as a search that came up short.
+
 **An invariant, written into `keywords.ts` because it's the kind of thing a
 later change breaks by accident:** the learned taste vector must never reach
 the keyword builder. Weights scale scores; intent chooses queries; the two
