@@ -720,7 +720,9 @@ function renderPlan(it) {
               el("span", {}, `${w.precipChance}% rain`),
             ])
           : null,
-        day.costUsd > 0 ? el("div", { class: "day-spend" }, `${Math.round(day.costUsd)}`) : null,
+        // No per-day figure: a day showing $31 when two of its three items
+        // published no price is the same claim as the old plan total, just
+        // smaller and harder to notice.
       ]),
       stops,
     ]))
@@ -728,19 +730,36 @@ function renderPlan(it) {
 
   const foot = $("planFoot")
   clear(foot)
-  // The total is a floor, and saying so is the difference between a number
-  // and a claim. Half of what a weekend costs is admission nobody publishes
-  // on a listing page — the Florida Aquarium took an afternoon and the plan
-  // read $0.
+  // What things cost, without a total.
+  //
+  // A plan total cannot be honest here. Google Maps prices 5% of what it
+  // returns — 22 of 469 in the store — so a weekend of six is typically two
+  // known prices and four unknowns, and any single figure built from that
+  // reads as the cost of the weekend whatever caveat is printed beside it.
+  //
+  // The prices that ARE published are worth showing, because they are the
+  // ticketed things where cost actually decides anything. So: name them, and
+  // say plainly that the rest are unknown rather than adding them as zero.
+  const priced = it.days
+    .flatMap((d) => d.items)
+    .filter((i) => i.candidate.priceUsd !== null && i.candidate.priceUsd > 0)
+  const free = it.days
+    .flatMap((d) => d.items)
+    .filter((i) => i.candidate.priceUsd === 0).length
   const unpriced = it.unpriced ?? 0
-  const total = Math.round(it.totalUsd)
+
+  const money =
+    priced.length === 0
+      ? "Nothing here published a price."
+      : `${priced.length === 1 ? "One of these is ticketed" : `${priced.length} of these are ticketed`}` +
+        ` — ${priced.map((i) => `$${Math.round(i.candidate.priceUsd)}`).join(" and ")} a head.`
+
   foot.append(
-    el("span", { class: "plan-total" }, unpriced > 0 ? `$${total}+` : `$${total}`),
-    el("span", {}, `of the $${it.budgetUsd} you had in mind`),
+    el("span", { class: "plan-money" }, money),
     unpriced > 0
       ? el("span", { class: "plan-note" },
-          `${unpriced} of these ${unpriced === 1 ? "publishes" : "publish"} no price, ` +
-          "so the real figure is higher. Nothing here is a guess.")
+          `${unpriced} of them ${unpriced === 1 ? "publishes" : "publish"} no price at all` +
+          `${free > 0 ? `, and ${free} ${free === 1 ? "is" : "are"} free` : ""}.`)
       : null,
     ...it.notes.map((n) => el("span", { class: "plan-note" }, n)),
   )

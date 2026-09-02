@@ -698,7 +698,7 @@ body.has-gpu .aurora { display: none; }
   margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--rule);
   font-size: 14px; color: var(--muted);
 }
-.plan-total { font-family: var(--display); font-weight: 700; font-size: 26px; color: var(--ink); letter-spacing: -0.04em; }
+.plan-money { font-weight: 600; font-size: 14px; color: var(--ink); }
 .plan-note { flex-basis: 100%; color: var(--faint); font-size: 13px; }
 
 /* An unmet request. Coloured like the form error rather than like a note,

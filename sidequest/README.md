@@ -499,8 +499,49 @@ produced the ordering, and the same numbers appear in the browser under
 
 The itinerary builder then does what a ranked list can't: no two adjacent slots
 from the same category, geography-aware hops, outdoor things demoted on wet
-days, one source never owning every slot, a running budget total, and a dated
-event only ever placed on the day it actually happens.
+days, one source never owning every slot, and a dated event only ever placed
+on the day it actually happens.
+
+### There is no weekend total, on purpose
+
+The budget shapes the **search** — under about $40 a head a day it goes
+looking for free things to do, happy hour and free museum days, which finds
+options that filtering an expensive list never would. What it does not do is
+add up.
+
+Measured across the stored candidates, this is why:
+
+| Source | Publishes a price |
+|---|---|
+| Groupon | 87% — the price *is* the product |
+| Eventbrite | 67% |
+| AllEvents | 13% |
+| **Google Maps** | **5%** (22 of 469) |
+| TripAdvisor, Time Out | 0% |
+
+Maps is the source that supplies nearly every venue, and it prices one in
+twenty. So a weekend of six is typically two known prices and four unknowns,
+and any single figure built from that reads as *the cost of the weekend*
+whatever caveat is printed beside it. An earlier version totalled it anyway
+and put the Florida Aquarium in an afternoon at $0, because `priceUsd` is
+`null` when nobody published one and the arithmetic coerced that to free —
+which `types.ts` had warned against from the first commit.
+
+The prices that *are* published get shown, because they are the ticketed
+things where cost decides anything. The rest are named as unknown:
+
+```
+2 of these are ticketed — $31 and $18 a head.
+3 of them publish no price at all, and 1 is free.
+```
+
+Scraping the venues for the missing ones was the obvious next move and is not
+worth it. Restaurants have a menu rather than a price, admission is
+conditional on age and time and whether you booked ahead, and every venue
+site is its own layout — it would be the most breakable code in the project,
+bought to firm up a number that still could not be complete. The budget stays
+a hard cap against the prices that exist, and stays silent about the ones
+that do not.
 
 ## It learns
 
