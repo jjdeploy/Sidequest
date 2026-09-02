@@ -73,6 +73,20 @@ export function cleanField(raw: string | undefined | null): string | undefined {
   // was only holding it up.
   s = s.replace(/[\s.·|,–—-]*(?:\.{3}|…)\s*$/, "").trim()
   s = s.replace(/^[\s.·|,–—-]+/, "").trim()
+
+  // The seam where the card ended and the offer copy began.
+  //
+  // Groupon runs its card text together, so a merchant name arrives with the
+  // start of the blurb glued to it: "Woods ATV Rentals - Brooksville,
+  // FLAccess to 2,". A state code followed immediately by a capitalised word
+  // is that seam, and it is specific enough not to fire on anything else.
+  s = s.replace(/(,\s*[A-Z]{2})(?=[A-Z][a-z])[\s\S]*$/, "$1").trim()
+
+  // A bracket with nothing after it was holding up text that got truncated
+  // away. "AMC Theatres(" and "Brio Italian Grille(" both reached plan cards.
+  // Only when unmatched: "Cantina Louie (Palm Coast, FL)" is the whole name.
+  s = s.replace(/[\s([{<]+$/, "").trim()
+
   return isDegenerate(s) ? undefined : s
 }
 

@@ -212,6 +212,32 @@ describe("isJunkEvent: a discount is not a thing to do", () => {
   })
 })
 
+describe("text hygiene: what a truncated card leaves behind", () => {
+  // All three verbatim from one Tampa run, and two of them were printed on
+  // plan cards. Groupon runs its card text together and the title extraction
+  // stops mid-punctuation.
+  test("a dangling bracket is not part of the name", () => {
+    assert.equal(cleanField("AMC Theatres("), "AMC Theatres")
+    assert.equal(cleanField("Brio Italian Grille("), "Brio Italian Grille")
+    assert.equal(cleanField("Sunset Lanes ["), "Sunset Lanes")
+  })
+
+  test("the next sentence running into the name is cut at the seam", () => {
+    // "…Brooksville, FLAccess to 2," is a merchant name with the start of
+    // the offer copy glued to it. A state code followed straight by a
+    // capitalised word is where the card ended and the blurb began.
+    assert.equal(
+      cleanField("Woods ATV Rentals - Brooksville, FLAccess to 2,"),
+      "Woods ATV Rentals - Brooksville, FL",
+    )
+  })
+
+  test("...without touching a name that legitimately has brackets in it", () => {
+    assert.equal(cleanField("Cantina Louie (Palm Coast, FL)"), "Cantina Louie (Palm Coast, FL)")
+    assert.equal(cleanField("The One Stop (Bar, Live Music & Kitchen)"), "The One Stop (Bar, Live Music & Kitchen)")
+  })
+})
+
 describe("text hygiene", () => {
   test("decodes double-encoded entities", () => {
     assert.equal(decodeEntities("Fish &amp;amp; Chips"), "Fish & Chips")
