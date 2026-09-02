@@ -397,6 +397,7 @@ const NOOP = { ok: false, set() {}, stop() {} }
 let vgpu = null
 let device = null
 let clock = null
+let booting = null
 /** Every live canvas. One loop draws all of them. */
 const mounted = new Set()
 
@@ -404,25 +405,39 @@ const mounted = new Set()
  * The one GPU context, and the one frame loop over it.
  *
  * Three canvases, one device. The first version called init() per canvas,
- * which is against the grain of the library — "a program has one Gpu
- * context" — and gave the hero graphic a device whose frames nothing ever
- * submitted, so it rendered as a black rectangle: the canvas element sized
- * correctly, with no colour attachment ever presented to it.
+ * which is against the grain of a library whose first line is that a program
+ * has one context.
  *
- * One clock, too, so the background and the graphic never drift apart.
+ * The second version cached the device in a variable and still made two,
+ * because two canvases mount concurrently and both got past `if (device)`
+ * before either had finished awaiting. Chrome was explicit about the result:
+ *
+ *   TextureView ... is associated with [Device], and cannot be used with
+ *   [Device]. While validating colorAttachments[0].
+ *
+ * A surface built on the first device, a frame encoded on the second, every
+ * command buffer rejected, nothing ever presented — and a canvas showing its
+ * own CSS background, which is to say a black box.
+ *
+ * So what is cached is the PROMISE, not what it resolves to. Everyone who
+ * asks during the boot gets the same one, and there is exactly one device no
+ * matter how many canvases ask for it at once.
  */
-async function context() {
-  if (!navigator.gpu) return null
-  if (device) return device
-  try {
-    vgpu = vgpu ?? (await import("vgpu"))
-    device = await vgpu.init()
-    clock = vgpu.clock(device)
-  } catch (err) {
-    console.warn("[sidequest] no WebGPU; keeping the CSS background", err)
-    device = null
-  }
-  return device
+function context() {
+  if (!navigator.gpu) return Promise.resolve(null)
+  booting ??= (async () => {
+    try {
+      vgpu = await import("vgpu")
+      device = await vgpu.init()
+      clock = vgpu.clock(device)
+      return device
+    } catch (err) {
+      console.warn("[sidequest] no WebGPU; keeping the CSS background", err)
+      device = null
+      return null
+    }
+  })()
+  return booting
 }
 
 /**

@@ -14,7 +14,8 @@
     "feedback": "tsx --env-file-if-exists=.env src/cli.ts feedback",
     "history": "tsx --env-file-if-exists=.env src/cli.ts history",
     "geo-proof": "tsx --env-file-if-exists=.env src/geo-proof.ts",
-    "harden": "tsx --env-file-if-exists=.env src/harden.ts"
+    "harden": "tsx --env-file-if-exists=.env src/harden.ts",
+    "probe": "node probe.mjs"
   },
   "dependencies": {
     "@solarisdk/browser": "^0.1.1",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "playwright": "^1.62.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }
