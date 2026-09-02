@@ -6,7 +6,7 @@
  */
 import { test, describe } from "node:test"
 import assert from "node:assert/strict"
-import { buildKeywords, requestedCategories } from "../src/engine/keywords.js"
+import { buildKeywords, requestedCategories, stripTimeWords, timeOfDayFrom } from "../src/engine/keywords.js"
 import { buildItinerary } from "../src/engine/itinerary.js"
 import { rank } from "../src/engine/score.js"
 import { candidate, request, scored, WEEKEND } from "./helpers.js"
@@ -300,5 +300,84 @@ describe("saying WHEN you want it", () => {
   test("afternoon means afternoon", () => {
     const it = buildItinerary([lanes(), ...filler()], request({ timeOfDay: "afternoon" }), [], new Set(["active"]), "afternoon")
     assert.equal(slotOf(it, "lanes"), "Afternoon")
+  })
+})
+
+describe("reading the request without asking a model", () => {
+  // timeOfDay used to come only from the LLM, which made it a coin flip: the
+  // same sentence returned "evening" on one run and nothing on the next, and
+  // with nothing the reserved slot fires at the first hour of the weekend. So
+  // "bowling at night" came back as bowling at 10am, then correctly, then at
+  // 10am again. A model is the wrong tool for a decision that has to be the
+  // same every time.
+  const cases: Array<[string, string | undefined]> = [
+    ["bowling at night", "evening"],
+    ["something tonight", "evening"],
+    ["live music after dark", "evening"],
+    ["drinks at 9pm", "evening"],
+    ["mini golf in the morning", "morning"],
+    ["brunch somewhere", "morning"],
+    ["museums in the afternoon", "afternoon"],
+    ["lunch by the water", "afternoon"],
+    ["bowling", undefined],
+    ["somewhere cheap", undefined],
+  ]
+  for (const [text, want] of cases) {
+    test(`"${text}" -> ${want ?? "(unstated)"}`, () => assert.equal(timeOfDayFrom(text), want))
+  }
+
+  test("the raw sentence alone is enough to ask for bowling", () => {
+    // resolvePlanRequest pushes the untouched text into vibes, so the
+    // substring vocabulary sees the user's own words whether or not the
+    // claude CLI is installed.
+    const asked = requestedCategories(buildKeywords(request({ vibes: ["bowling at night"] }), 8))
+    assert.ok(asked.has("active"), `got ${[...asked].join(", ")}`)
+  })
+
+  test("and it still lands in the evening", () => {
+    const lanes = scored(candidate({ id: "lanes", category: "active" }), 5)
+    const filler = Array.from({ length: 14 }, (_, i) =>
+      scored(candidate({ id: `p-${i}`, category: i % 2 ? "outdoors" : "food", rating: 4.8, reviewCount: 4000 }), 38 - i),
+    )
+    const when = timeOfDayFrom("bowling at night")
+    const it = buildItinerary([lanes, ...filler], request({ timeOfDay: when }), [], new Set(["active"]), when)
+    const slot = it.days.flatMap((d) => d.items).find((i) => i.scored.candidate.id === "lanes")?.slot
+    assert.equal(slot, "Evening")
+  })
+})
+
+describe("a time phrase is a time, not a mood", () => {
+  // Feeding the whole sentence to the vibe vocabulary matched "night" as
+  // nightlife too, so "bowling at night" quietly became a request for bowling
+  // AND cocktail bars AND live music AND breweries — five categories, all
+  // pinned to the two evening slots, and the bowling lost its slot to them.
+  test("the time comes out of the text once it has been read", () => {
+    assert.equal(stripTimeWords("bowling at night"), "bowling")
+    assert.equal(stripTimeWords("live music tonight"), "live music")
+    assert.equal(stripTimeWords("drinks at 9pm"), "drinks at")
+    assert.equal(stripTimeWords("bowling"), "bowling", "nothing to strip")
+    assert.equal(stripTimeWords("somewhere on the water"), "somewhere on the water")
+  })
+
+  test('"bowling at night" asks for bowling, not for nightlife', () => {
+    const withTime = requestedCategories(buildKeywords(request({ vibes: ["bowling at night"] }), 8))
+    const stripped = requestedCategories(buildKeywords(request({ vibes: [stripTimeWords("bowling at night")] }), 8))
+    assert.ok(withTime.has("nightlife"), "the whole sentence drags nightlife in")
+    assert.ok(!stripped.has("nightlife"), `stripped still asked for: ${[...stripped].join(", ")}`)
+    assert.ok(stripped.has("active"), "but it still asks for bowling")
+  })
+
+  test("the whole path holds together: text in, evening bowling out", () => {
+    const ask = "bowling at night"
+    const when = timeOfDayFrom(ask)
+    const asked = requestedCategories(buildKeywords(request({ vibes: [stripTimeWords(ask)] }), 8))
+
+    const lanes = scored(candidate({ id: "lanes", category: "active" }), 5)
+    const filler = Array.from({ length: 16 }, (_, i) =>
+      scored(candidate({ id: `p-${i}`, category: i % 2 ? "outdoors" : "food", rating: 4.8, reviewCount: 4000 }), 38 - i),
+    )
+    const it = buildItinerary([lanes, ...filler], request({ timeOfDay: when }), [], asked, when)
+    const slot = it.days.flatMap((d) => d.items).find((i) => i.scored.candidate.id === "lanes")?.slot
+    assert.equal(slot, "Evening")
   })
 })

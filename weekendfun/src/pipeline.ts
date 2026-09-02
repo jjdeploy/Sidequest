@@ -17,7 +17,7 @@
  */
 import { randomUUID } from "node:crypto"
 import { buildItinerary, type Itinerary } from "./engine/itinerary.js"
-import { buildKeywords, requestedCategories, type Keyword } from "./engine/keywords.js"
+import { buildKeywords, requestedCategories, stripTimeWords, timeOfDayFrom, type Keyword } from "./engine/keywords.js"
 import { describeTaste } from "./engine/learn.js"
 import { makeLocalityResolver } from "./engine/localities.js"
 import { screen, type ScreenSummary, type Verdict } from "./engine/relevance.js"
@@ -109,6 +109,19 @@ export async function resolvePlanRequest(where: string, draft: RequestDraft): Pr
 
   let askNote: string | null = null
   if (draft.ask) {
+    // Read the request deterministically FIRST, from the words they typed.
+    //
+    // The vocabulary in keywords.ts already matches on substrings, so handing
+    // it the raw sentence gets "bowling at night" to bowling and to nightlife
+    // without asking anything. The model then widens that; it does not decide
+    // it. Two things follow: the same sentence gives the same plan every
+    // time, and `--ask` degrades to something useful with the claude CLI
+    // absent instead of doing nothing at all.
+    req.timeOfDay = timeOfDayFrom(draft.ask)
+    // With the time taken out, so "night" isn't also read as a mood.
+    const what = stripTimeWords(draft.ask)
+    if (what) req.vibes = [...req.vibes, what]
+
     const parsed = await parseIntake(draft.ask)
     if (parsed) {
       if (parsed.vibes?.length) req.vibes = [...req.vibes, ...parsed.vibes]
@@ -118,7 +131,10 @@ export async function resolvePlanRequest(where: string, draft: RequestDraft): Pr
       if (parsed.kidAges?.length) req.party.kidAges = parsed.kidAges
       if (parsed.mobility) req.mobility = parsed.mobility
       if (parsed.avoid?.length) req.avoid = [...req.avoid, ...parsed.avoid]
-      if (parsed.timeOfDay) req.timeOfDay = parsed.timeOfDay
+      // Only if our own reading found nothing — the deterministic answer wins.
+      if (!req.timeOfDay && parsed.timeOfDay) req.timeOfDay = parsed.timeOfDay
+      // The deterministic read and the model often land on the same word.
+      req.vibes = [...new Set(req.vibes.map((v) => v.trim()).filter(Boolean))]
       askNote = [
         req.vibes.join(", "),
         req.timeOfDay && `in the ${req.timeOfDay}`,
@@ -126,7 +142,11 @@ export async function resolvePlanRequest(where: string, draft: RequestDraft): Pr
         req.mobility,
       ].filter(Boolean).join(" · ")
     } else {
-      askNote = "couldn't parse — using the form values"
+      // No model, or it failed. The deterministic read still stands.
+      askNote = [
+        draft.ask,
+        req.timeOfDay && `in the ${req.timeOfDay}`,
+      ].filter(Boolean).join(" · ")
     }
   }
 

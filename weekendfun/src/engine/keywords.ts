@@ -115,6 +115,50 @@ export function requestedCategories(keywords: Keyword[]): Set<Category> {
   return new Set(keywords.filter((k) => k.weight >= ASKED_FOR).map((k) => k.category))
 }
 
+/**
+ * When they said they wanted it, read straight from their own words.
+ *
+ * This existed only as a field the LLM filled in, which made it a coin flip:
+ * the same sentence returned `timeOfDay: "evening"` on one run and nothing
+ * on the next, and with nothing the reserved slot fires at the first hour of
+ * the weekend — so "bowling at night" came back as bowling at 10am, then
+ * correctly, then at 10am again.
+ *
+ * A model is the right tool for reading an unusual request. It is the wrong
+ * tool for a decision that has to be the same every time, and "does this
+ * sentence say evening" is not a hard question.
+ */
+export function timeOfDayFrom(text: string): PlanRequest["timeOfDay"] {
+  const s = text.toLowerCase()
+  if (/\b(night|nights|tonight|evening|after dark|nightcap|late)\b|\d\s*pm\b/.test(s)) return "evening"
+  if (/\b(morning|mornings|breakfast|brunch|early|sunrise)\b|\d\s*am\b/.test(s)) return "morning"
+  if (/\b(afternoon|afternoons|midday|lunch|lunchtime)\b/.test(s)) return "afternoon"
+  return undefined
+}
+
+/**
+ * The same words, removed.
+ *
+ * "bowling at night" is one activity and one time. Feeding the whole
+ * sentence to the vibe vocabulary matched "night" as nightlife as well, so a
+ * request for bowling quietly became a request for bowling AND cocktail bars
+ * AND live music AND breweries — five categories, all pinned to the two
+ * evening slots, and the bowling lost. A time phrase is consumed by
+ * timeOfDayFrom; it must not also be read as a mood.
+ */
+export function stripTimeWords(text: string): string {
+  return text
+    // "at night", "in the morning" — the preposition goes with it.
+    .replace(/\b(?:at|in|on|during|this|the)\s+(?:night|nights|tonight|evening|evenings|morning|mornings|afternoon|afternoons|midday|sunrise)\b/gi, " ")
+    // ...and the bare word on its own.
+    .replace(/\b(?:night|nights|tonight|evening|evenings|morning|mornings|afternoon|afternoons|midday|sunrise|after dark)\b/gi, " ")
+    .replace(/\b\d{1,2}\s*(?:am|pm)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+
+
 function normalizeVibe(v: string): string[] {
   const s = v.toLowerCase().trim()
   const hits: string[] = []

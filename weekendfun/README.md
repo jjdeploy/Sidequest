@@ -243,8 +243,26 @@ matched no key at all, the floor took over, and the request asked for nothing
 in particular. The prompt now says to keep concrete activities as themselves,
 and "night", "evening" and "after dark" all reach nightlife.
 
-There was also no concept of *when*. `timeOfDay` is a field now, and the
-reserved slot waits for it — the whole bonus in the hour you asked for and
+There was also no concept of *when*, and the first fix for that put the
+extraction in the LLM's hands — which made it a coin flip. The same sentence
+returned `timeOfDay: "evening"` on one run and nothing on the next, and with
+nothing the reserved slot fires at the first hour of the weekend. "bowling at
+night" came back as bowling at 10am, then correctly, then at 10am again.
+
+A model is the right tool for reading an unusual request. It is the wrong tool
+for a decision that has to be the same every time, and *does this sentence say
+evening* is not a hard question. The time is read deterministically from the
+user's own words now, and the model only widens what that found. Two things
+follow: the same sentence gives the same plan, and `--ask` degrades to
+something useful with the `claude` CLI absent instead of doing nothing.
+
+The time phrase is then **removed** before the text is matched for mood.
+Leaving it in matched "night" as nightlife as well, so a request for bowling
+quietly became a request for bowling *and* cocktail bars *and* live music
+*and* breweries — five categories, all pinned to the two evening slots, and
+the bowling lost its slot to them.
+
+`timeOfDay` is a field, and the reserved slot waits for it — the whole bonus in the hour you asked for and
 nothing anywhere else. A consolation bonus in the other slots doesn't work:
 combined with the ranking bonus it still beat a 4.8-star park, and the answer
 came back as bowling at ten in the morning a second time.
