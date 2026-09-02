@@ -190,63 +190,94 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 }
 .hero-line span { display: block; animation: riseIn .6s cubic-bezier(.2,.8,.25,1) backwards; }
 .hero-line span:nth-child(1) { animation-delay: .06s; }
-.hero-line span:nth-child(2) { color: var(--muted); animation-delay: .14s; }
-.hero-line span:nth-child(3) { color: var(--coral); animation-delay: .22s; }
+.hero-line span:nth-child(2) { animation-delay: .16s; }
+/* The turn of the sentence carries the colour. Setting a whole line in grey
+   made the second half read as less important than the first, which is
+   backwards — it is the half with the promise in it. */
+.hero-line em { font-style: normal; color: var(--coral); }
 @keyframes riseIn { from { opacity: 0; transform: translateY(14px); } }
 
 .hero-sub { max-width: 50ch; color: var(--muted); font-size: 16px; margin: 0 0 var(--s6); }
 
-.ask { display: flex; flex-direction: column; gap: var(--s4); }
-.field { display: flex; flex-direction: column; gap: var(--s2); min-width: 0; }
+.ask { display: flex; flex-direction: column; gap: var(--s3); max-width: 620px; }
 
-.ask input {
-  width: 100%; background: var(--card);
-  border: 1px solid var(--rule-2); border-radius: var(--r-md);
-  color: var(--ink); font-size: 16px;
-  padding: 13px 15px;
+/* One bar, three parts: where, when, go. Two labelled fields stacked above a
+   button asked three questions where the product only really has one. */
+.searchbar {
+  display: flex; align-items: stretch; gap: 0;
+  background: var(--card); border: 1px solid var(--rule-2);
+  border-radius: var(--r-pill); padding: var(--s1);
+  box-shadow: var(--shadow-lift);
   transition: border-color .16s, box-shadow .16s;
-  box-shadow: var(--shadow);
 }
-#city { font-family: var(--display); font-weight: 700; font-size: 21px; letter-spacing: -0.025em; padding: 13px 16px; }
-.ask input:focus { outline: none; border-color: var(--coral); box-shadow: 0 0 0 3px rgba(244,85,44,.14); }
-.ask input:disabled { background: var(--sand); color: var(--faint); cursor: not-allowed; box-shadow: none; }
-.ask input::placeholder { color: #c8b4a2; }
+.searchbar:focus-within { border-color: var(--coral); box-shadow: 0 0 0 4px rgba(244,85,44,.12), var(--shadow-lift); }
 
-.go {
-  margin-top: var(--s1);
-  border: 0; border-radius: var(--r-md); cursor: pointer;
+.sb-seg { display: flex; align-items: center; gap: var(--s2); padding: 0 var(--s3); min-width: 0; }
+.sb-place { flex: 1 1 46%; }
+.sb-when { flex: 0 1 auto; position: relative; }
+.sb-icon { width: 18px; height: 18px; flex: none; color: var(--faint); }
+.sb-div { width: 1px; align-self: center; height: 26px; background: var(--rule); flex: none; }
+
+.searchbar input {
+  width: 100%; min-width: 0; border: 0; background: none; padding: 13px 0;
+  font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.searchbar input:focus { outline: none; }
+.searchbar input::placeholder { color: #c8b4a2; }
+
+.sb-when-btn {
+  display: flex; align-items: center; gap: var(--s2);
+  background: none; border: 0; cursor: pointer; padding: 13px 0;
+  font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: -0.02em;
+  color: var(--ink); white-space: nowrap;
+}
+.sb-chev { width: 8px; height: 8px; border-right: 2px solid var(--faint); border-bottom: 2px solid var(--faint); transform: rotate(45deg) translate(-2px,-2px); transition: transform .16s; }
+.sb-when-btn[aria-expanded="true"] .sb-chev { transform: rotate(-135deg) translate(-3px,-3px); }
+
+.sb-go {
+  flex: none; width: 46px; height: 46px; border: 0; border-radius: 50%;
   background: linear-gradient(135deg, var(--mango), var(--coral) 70%);
-  color: #fff; font-family: var(--body); font-weight: 650; font-size: 16px;
-  padding: 15px 26px; white-space: nowrap;
-  display: flex; align-items: baseline; justify-content: center; gap: var(--s2);
+  color: #fff; cursor: pointer; display: grid; place-items: center;
+  box-shadow: 0 6px 16px -6px rgba(244,85,44,.75);
   transition: transform .14s, box-shadow .14s, opacity .14s;
-  box-shadow: 0 8px 20px -8px rgba(244,85,44,.65);
 }
-.go:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 26px -8px rgba(244,85,44,.7); }
-.go:disabled { opacity: .5; cursor: progress; box-shadow: none; }
-.go-sub { font: 400 12.5px var(--mono); opacity: .8; }
-/* Which weekend. Four cards rather than a date field: picking a weekend is
-   choosing between four options, not entering an arbitrary date, and a
-   calendar makes you find the Saturday yourself. */
-.weekends { display: flex; flex-wrap: wrap; gap: var(--s2); }
-.weekend {
-  flex: 1 1 118px; min-width: 108px;
-  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
-  padding: var(--s3) var(--s4);
-  background: var(--card); border: 1px solid var(--rule-2); border-radius: var(--r-md);
-  cursor: pointer; text-align: left; transition: all .14s;
+.sb-go svg { width: 19px; height: 19px; }
+.sb-go:hover:not(:disabled) { transform: scale(1.05); }
+.sb-go:disabled { opacity: .5; cursor: progress; box-shadow: none; }
+
+/* The weekend popover. Small, close to its trigger, four rows. */
+.when-pop {
+  position: absolute; top: calc(100% + 10px); left: -8px; z-index: 30;
+  min-width: 236px; padding: var(--s1);
+  background: var(--card); border: 1px solid var(--rule-2);
+  border-radius: var(--r-lg); box-shadow: 0 18px 44px -16px rgba(80,50,25,.4);
+  animation: popIn .14s ease-out;
 }
-.weekend:hover { border-color: var(--coral); }
-.weekend-month { font: 500 10px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
-.weekend-days { font-family: var(--display); font-weight: 700; font-size: 21px; letter-spacing: -0.03em; line-height: 1.1; }
-.weekend-days i { font-style: normal; color: var(--rule-2); margin: 0 2px; }
-.weekend-label { font-size: 11.5px; color: var(--muted); }
-.weekend[aria-pressed="true"] {
-  border-color: var(--coral); background: #fff3ef;
-  box-shadow: 0 0 0 3px rgba(244,85,44,.12);
+@keyframes popIn { from { opacity: 0; transform: translateY(-4px); } }
+.when-opt {
+  display: flex; align-items: baseline; gap: var(--s3); width: 100%;
+  padding: 9px var(--s3); border: 0; border-radius: var(--r-md);
+  background: none; cursor: pointer; text-align: left;
 }
-.weekend[aria-pressed="true"] .weekend-month,
-.weekend[aria-pressed="true"] .weekend-label { color: var(--coral); }
+.when-opt:hover { background: var(--sand); }
+.when-opt[aria-selected="true"] { background: #fff1ec; }
+.when-opt-dates { font-family: var(--display); font-weight: 700; font-size: 14.5px; letter-spacing: -0.02em; white-space: nowrap; }
+.when-opt[aria-selected="true"] .when-opt-dates { color: var(--coral); }
+.when-opt-label { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+.ask-line {
+  width: 100%; background: var(--card);
+  border: 1px solid var(--rule); border-radius: var(--r-pill);
+  padding: 11px var(--s5); font-size: 14.5px; color: var(--ink);
+  transition: border-color .16s;
+}
+.ask-line:focus { outline: none; border-color: var(--coral); }
+.ask-line:disabled { background: var(--sand); color: var(--faint); cursor: not-allowed; }
+.ask-line::placeholder { color: #c2ae9d; }
+
+.popular { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-top: var(--s2); }
+.ask-hint { font: 400 12px var(--mono); color: var(--red); }
 
 .chips { display: flex; flex-wrap: wrap; gap: var(--s1); }
 .chip {
@@ -598,12 +629,28 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 @media (max-width: 700px) {
   .lane { grid-template-columns: 96px minmax(0,1fr); }
   .lane-out { grid-column: 2; text-align: left; }
-  .slot { grid-template-columns: 1fr; gap: var(--s2); }
-  .slot-when { display: flex; align-items: baseline; gap: var(--s2); padding-top: 0; }
-  .slot-when b { margin-bottom: 0; }
   .row { grid-template-columns: 1fr; gap: 2px; }
   .status-ready { margin-left: 0; }
   .aurora { filter: blur(50px); }
+
+  /* The bar becomes two rows: a phone can't hold city, weekend and a button
+     side by side without squeezing the city down to three characters. */
+  .searchbar { flex-wrap: wrap; border-radius: 22px; padding: var(--s2); row-gap: var(--s1); }
+  .sb-place { flex: 1 1 100%; order: 1; }
+  .sb-div { display: none; }
+  .sb-when { order: 2; flex: 1 1 auto; border-top: 1px solid var(--rule); padding-top: var(--s2); }
+  .sb-go { order: 3; align-self: center; margin-top: var(--s2); }
+  .when-pop { left: auto; right: -52px; }
+
+  /* The timeline gutter collapses: the hour sits above the stop instead of
+     out to its left, and the rule and dots go with it. */
+  .stops { margin-left: 0; padding: var(--s4) var(--s4) var(--s5); }
+  .stops::before { display: none; }
+  .stop { flex-wrap: wrap; }
+  .stop-time { position: static; width: auto; flex: 1 0 100%; text-align: left; padding: 0 0 var(--s2); display: flex; align-items: baseline; gap: var(--s2); }
+  .stop-time::after { display: none; }
+  .stop-thumb { width: 78px; height: 78px; }
+  .day-head { padding: var(--s4); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -55,43 +55,60 @@
 
       <h1 class="hero-line">
         <span>You're bored.</span>
-        <span>This town isn't.</span>
+        <span>This town <em>isn't</em>.</span>
       </h1>
 
-      <p class="hero-sub">
-        Twelve sites know what's on this weekend and none of them talk to each
-        other. We read all of them at once, from a browser standing in your
-        city. Takes about twenty seconds.
-      </p>
+      <p class="hero-sub">A dozen local sites, read at once, from a browser standing in your city.</p>
 
       <form class="ask" id="planForm" autocomplete="off">
-        <div class="field">
-          <span class="field-label">Where</span>
-          <input id="city" name="city" list="cityList" placeholder="Tampa, FL" required
-                 autocapitalize="words" spellcheck="false">
-          <datalist id="cityList">
-            <option value="Tampa, FL"><option value="Palm Coast, FL"><option value="Austin, TX">
-            <option value="Seattle, WA"><option value="Asheville, NC"><option value="Boise, ID">
-            <option value="New Orleans, LA"><option value="Portland, OR">
-          </datalist>
+        <!-- One bar: where, when, go. The weekend is a button rather than a
+             field because picking one is choosing, not typing. -->
+        <div class="searchbar">
+          <label class="sb-seg sb-place">
+            <svg class="sb-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" fill="none" stroke="currentColor" stroke-width="1.7"/>
+              <circle cx="12" cy="10" r="2.5" fill="currentColor"/>
+            </svg>
+            <input id="city" name="city" list="cityList" placeholder="Tampa, FL" required
+                   autocapitalize="words" spellcheck="false">
+            <datalist id="cityList">
+              <option value="Tampa, FL"><option value="Palm Coast, FL"><option value="Austin, TX">
+              <option value="Seattle, WA"><option value="Asheville, NC"><option value="Boise, ID">
+              <option value="New Orleans, LA"><option value="Portland, OR">
+            </datalist>
+          </label>
+
+          <span class="sb-div" aria-hidden="true"></span>
+
+          <div class="sb-seg sb-when">
+            <svg class="sb-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3.5" y="5" width="17" height="15" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/>
+              <path d="M3.5 10h17M8 3.2v3.4M16 3.2v3.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+            <button type="button" id="whenBtn" class="sb-when-btn" aria-haspopup="listbox" aria-expanded="false">
+              <span id="whenLabel">This weekend</span>
+              <span class="sb-chev" aria-hidden="true"></span>
+            </button>
+            <div class="when-pop" id="whenPop" role="listbox" aria-label="Which weekend" hidden></div>
+          </div>
+
+          <button class="sb-go" id="go" type="submit" aria-label="Find my weekend">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.4" fill="none" stroke="currentColor" stroke-width="2.1"/>
+              <path d="M16 16l4.6 4.6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+            </svg>
+          </button>
         </div>
 
-        <div class="field">
-          <span class="field-label">Which weekend</span>
-          <div class="weekends" id="weekends"></div>
+        <input id="ask" name="ask" class="ask-line"
+               placeholder="or say what you're after — bowling at night, under $80">
+
+        <div class="popular">
+          <span class="field-label">Popular</span>
+          <div class="chips" id="moodChips"></div>
+          <span class="ask-hint" id="askHint" hidden></span>
         </div>
 
-        <label class="field">
-          <span class="field-label">
-            What are you after?
-            <em id="askHint">optional</em>
-          </span>
-          <input id="ask" name="ask" placeholder="bowling at night, under $80">
-        </label>
-
-        <div class="chips" id="moodChips"></div>
-
-        <button class="go" id="go" type="submit">Find my weekend</button>
         <p class="ask-error" id="formError" hidden></p>
       </form>
     </div>

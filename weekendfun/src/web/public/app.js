@@ -125,34 +125,43 @@ function upcomingWeekends(count = 4) {
 }
 
 function buildWeekends() {
-  const host = $("weekends")
-  clear(host)
   state.weekends = upcomingWeekends(4)
   state.weekendIndex = 0
+  renderWhen()
+}
+
+/** The popover's four rows, and the label on the button that opens it. */
+function renderWhen() {
+  const pop = $("whenPop")
+  clear(pop)
 
   state.weekends.forEach((w, i) => {
-    const spoken = `${w.label ?? "Weekend"}, ${w.month} ${w.sat} to ${w.sunMonth ?? w.month} ${w.sun}`
-    host.append(el("button", {
-      type: "button", class: "weekend", "aria-pressed": String(i === 0),
-      // The visible label is three separate spans, which leaves the button
-      // with no accessible name at all.
-      "aria-label": spoken,
-      onclick: () => {
-        state.weekendIndex = i
-        for (const [j, node] of [...host.children].entries()) {
-          node.setAttribute("aria-pressed", String(j === i))
-        }
-      },
+    const dates = w.sunMonth
+      ? `${w.month} ${w.sat} – ${w.sunMonth} ${w.sun}`
+      : `${w.month} ${w.sat} – ${w.sun}`
+    pop.append(el("button", {
+      type: "button", class: "when-opt", role: "option",
+      "aria-selected": String(i === state.weekendIndex),
+      onclick: () => { state.weekendIndex = i; renderWhen(); closeWhen() },
     }, [
-      el("span", { class: "weekend-month" }, w.month),
-      el("span", { class: "weekend-days" }, [
-        String(w.sat),
-        el("i", {}, "–"),
-        w.sunMonth ? `${w.sunMonth} ${w.sun}` : String(w.sun),
-      ]),
-      el("span", { class: "weekend-label" }, w.label ?? "Sat & Sun"),
+      el("span", { class: "when-opt-dates" }, dates),
+      el("span", { class: "when-opt-label" }, w.label ?? "Sat & Sun"),
     ]))
   })
+
+  const chosen = state.weekends[state.weekendIndex]
+  $("whenLabel").textContent = chosen
+    ? chosen.label ?? `${chosen.month} ${chosen.sat}–${chosen.sun}`
+    : "This weekend"
+}
+
+function openWhen() {
+  $("whenPop").hidden = false
+  $("whenBtn").setAttribute("aria-expanded", "true")
+}
+function closeWhen() {
+  $("whenPop").hidden = true
+  $("whenBtn").setAttribute("aria-expanded", "false")
 }
 
 // ───────────────────────────────────────────────────────────────── state
@@ -221,12 +230,11 @@ async function boot() {
     // field. The mood chips work either way.
     const ask = $("ask")
     const hint = $("askHint")
-    if (s.claude) {
-      hint.textContent = "optional"
-    } else {
+    if (!s.claude) {
       ask.disabled = true
       ask.placeholder = "install the claude CLI to use this"
-      hint.textContent = "needs the claude CLI"
+      hint.textContent = "free text needs the claude CLI"
+      hint.hidden = false
     }
   } catch {
     showError("Can't reach the Bearings server. Is `npm run dashboard` still running?")
@@ -264,7 +272,22 @@ function wire() {
   $("aboutOpen").addEventListener("click", showAbout)
   $("modalClose").addEventListener("click", closeModal)
   $("modal").addEventListener("click", (e) => { if (e.target === $("modal")) closeModal() })
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal() })
+
+  $("whenBtn").addEventListener("click", () => {
+    $("whenPop").hidden ? openWhen() : closeWhen()
+  })
+  // Clicking anywhere else puts it away. Registered on the document rather
+  // than on a backdrop element so the rest of the page stays clickable —
+  // a backdrop would swallow the first click on whatever you meant to hit.
+  document.addEventListener("click", (e) => {
+    if (!$("whenPop").hidden && !$("whenBtn").contains(e.target) && !$("whenPop").contains(e.target)) closeWhen()
+  })
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return
+    closeWhen()
+    closeModal()
+  })
 }
 
 function showError(message) {
