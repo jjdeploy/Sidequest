@@ -104,10 +104,9 @@ body[data-screen="landing"] .screen--landing { display: flex; }
 
 .brand {
   justify-self: start;
-  display: inline-flex; align-items: center; gap: var(--s2);
+  display: inline-flex; align-items: center;
   background: none; border: 0; padding: var(--s1) 0; cursor: pointer;
 }
-.brand-mark { width: 20px; height: 20px; flex: none; display: block; }
 .brand-name { font-family: var(--display); font-weight: 800; font-size: 16.5px; letter-spacing: -0.03em; }
 
 /* The middle slot: empty on the landing page, the current position after. */
