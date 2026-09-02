@@ -410,12 +410,24 @@ function handle(e) {
     case "keywords": onKeywords(e.keywords); break
     case "launching": onLaunching(e); break
     case "pool": onPool(e.at, e.event); break
-    case "gathered": state.gathered = e; break
-    case "screened": state.screened = e.summary; break
+    // Rendered as each piece lands, not at the end.
+    //
+    // "How this was found" only ever ran from finish(), and finish() runs
+    // on `done` — which arrives AFTER the write-up, and the write-up
+    // shells out to the claude CLI and takes another ten to thirty
+    // seconds. So the panel sat empty through the whole window in which
+    // somebody, having just been given a plan, goes looking at how it was
+    // made.
+    case "gathered": state.gathered = e; renderRig(); break
+    case "screened": state.screened = e.summary; renderRig(); break
     case "ranked": state.catalogue = e.top; break
     case "itinerary": onItinerary(e.itinerary); break
     case "taste": state.weights = e.weights; renderTaste(e.weights); break
-    case "writeup": $("writeupBlock").hidden = false; $("writeup").textContent = e.text; break
+    case "writeup":
+      $("writeupBlock").hidden = false
+      $("writeupBlock").classList.remove("is-waiting")
+      $("writeup").textContent = e.text
+      break
     case "error": state.running = false; $("go").disabled = false; showError(e.message); break
     case "done": finish(); break
     default: break
@@ -676,6 +688,14 @@ function onItinerary(it) {
   screen("results")
   window.scrollTo(0, 0)
   renderPlan(it)
+
+  // The plan is here; the prose about it is still being written. Saying so
+  // is better than a gap that appears to be the end of the page.
+  if ($("writeupBlock").hidden) {
+    $("writeupBlock").hidden = false
+    $("writeupBlock").classList.add("is-waiting")
+    $("writeup").textContent = "Reading the plan back…"
+  }
   renderCatalogue()
   renderTaste(state.weights)
 }

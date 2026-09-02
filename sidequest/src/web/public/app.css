@@ -697,6 +697,14 @@ body.has-gpu .aurora { display: none; }
   margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--rule);
   font-size: 14px; color: var(--muted);
 }
+/* The write-up, while it is still being written. */
+.writeup.is-waiting #writeup { color: var(--faint); font-style: italic; }
+.writeup.is-waiting #writeup::after {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px;
+  border-radius: 50%; background: var(--mango); animation: pulse-dot 1.1s ease-in-out infinite;
+}
+@keyframes pulse-dot { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+
 .plan-money { font-weight: 600; font-size: 14px; color: var(--ink); }
 .plan-note { flex-basis: 100%; color: var(--faint); font-size: 13px; }
 
