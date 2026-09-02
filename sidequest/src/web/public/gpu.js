@@ -108,16 +108,18 @@ ${NOISE}
   // sitting on: high thresholds and low mixes leave most of the frame cream,
   // so the colour only shows where the field peaks.
   var col = ${CREAM};
-  col = mix(col, ${MANGO}, smoothstep(0.62, 1.05, f) * 0.20);
-  col = mix(col, ${CORAL}, smoothstep(0.74, 1.20, f + 0.30 * r.x) * 0.16);
-  col = mix(col, ${ROSE}, smoothstep(0.80, 1.25, f + 0.26 * q.y) * 0.10);
+  col = mix(col, ${MANGO}, smoothstep(0.42, 0.95, f) * 0.30);
+  col = mix(col, ${CORAL}, smoothstep(0.56, 1.08, f + 0.30 * r.x) * 0.22);
+  col = mix(col, ${ROSE}, smoothstep(0.74, 1.22, f + 0.26 * q.y) * 0.08);
 
   // A cool counterweight in the low corner, so the whole field is not one
   // temperature.
-  col = mix(col, ${SEA}, smoothstep(0.24, 0.02, f) * 0.035);
+  col = mix(col, ${SEA}, smoothstep(0.26, 0.02, f) * 0.045);
 
-  // Vignette to cream at the top, where the header sits over it.
-  let top = smoothstep(0.0, 0.45, uv.y);
+  // Softens only the strip the sticky header sits over. At 0.45 this was
+  // fading out the top half of the hero — which is where the headline is,
+  // and most of what anyone actually sees of this shader.
+  let top = smoothstep(0.0, 0.10, uv.y);
   col = mix(${CREAM}, col, top * params.fade);
 
   return vec4f(col, 1.0);
