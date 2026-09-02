@@ -629,9 +629,18 @@ visible in this repo already:
 single largest source of wrong answers here — a bowling *supply* retailer
 scheduled as an afternoon out, a business brokerage filed under food, a
 warehouse store filed under nightlife. Every fix has been another pattern for
-a case we had met. A model asked *"is this a place someone would spend a
-Saturday, and would it card a twenty-year-old?"* answers correctly on the
-first try, for a listing nobody has seen before.
+a case we had met.
+
+And one of them cannot be fixed with a pattern at all. Pin Chasers is a Tampa
+bowling alley, found by the search for bowling *and* by the search for
+arcades. Each keyword gets its own browser, they merge in whatever order they
+finish, and on that run the arcade shard won the race — so the town's bowling
+alley was typed `Video arcade`, failed to answer a request for bowling, and
+the evening went to a VR place. No vocabulary catches that, because the
+vocabulary was right both times. A model asked *"is this a place someone would
+spend a Saturday, and would it card a twenty-year-old?"* answers correctly on
+the first try, for a listing nobody has seen before, and does not care which
+browser got home first.
 
 **2. Helping with the selection itself.** The itinerary is greedy with a
 booking pass — good enough for six slots from a hundred candidates, and
