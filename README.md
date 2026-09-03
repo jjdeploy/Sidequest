@@ -17,7 +17,7 @@ request cannot reach: the web personalises on where your traffic comes from and
 what you have clicked before, so somebody who has just moved keeps being shown
 their old life.
 
-[![Sidequest — thirteen browsers planning a Tampa weekend](sidequest/docs/demo-poster.jpg)](https://jjdeploy.github.io/WeekendFun/sidequest/docs/watch.html)
+[![Sidequest — thirteen browsers planning a Tampa weekend](sidequest/docs/thumbnail.jpg)](https://jjdeploy.github.io/WeekendFun/sidequest/docs/watch.html)
 
 **[▶ Watch the run (1 min)](https://jjdeploy.github.io/WeekendFun/sidequest/docs/watch.html)** — Tampa, this weekend,
 typed from cold. Thirteen browsers up, 113 places read, a plan in about twenty

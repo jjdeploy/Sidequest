@@ -48,7 +48,7 @@ cp .env.example .env      # add your SOLARI_API_KEY
 npm run dashboard         # http://localhost:5173
 ```
 
-[![Sidequest — thirteen browsers planning a Tampa weekend](docs/demo-poster.jpg)](https://jjdeploy.github.io/WeekendFun/sidequest/docs/watch.html)
+[![Sidequest — thirteen browsers planning a Tampa weekend](docs/thumbnail.jpg)](https://jjdeploy.github.io/WeekendFun/sidequest/docs/watch.html)
 
 **[▶ Watch the run (1 min)](https://jjdeploy.github.io/WeekendFun/sidequest/docs/watch.html)** — Tampa, this weekend, typed from
 cold. Thirteen browsers up, 113 places read, a plan in about twenty seconds.
