@@ -56,8 +56,6 @@ The shot list that recording follows is in [`docs/demo-script.md`](docs/demo-scr
 The same city and sentence give the same plan every time, so a rehearsed take
 matches the real one.
 
-![The landing page](docs/landing.jpg)
-
 <!-- Demo video: paste the link here once recorded. docs/demo-script.md has
      the shot list; the run is deterministic so a rehearsed take matches. -->
 **▶ [Three-minute demo](#)** — *link to be added*
@@ -120,8 +118,6 @@ place means more than any one of them ranking it first, and it's the one signal
 a parallel fan-out computes that a single scraper cannot.
 
 ## 13 browsers, not 6
-
-![The fan-out](docs/fanout.jpg)
 
 Google Maps is the only source that publishes coordinates, ratings, *and*
 Google's own type descriptor — and the only one that lists ordinary local
@@ -321,8 +317,6 @@ their ToS and risk the account, which is a bad trade for a public repo. Add
 Without them the source skips itself and everything else runs.
 
 ## Search for what a bored person would search for
-
-![The plan, and everything else](docs/plan.jpg)
 
 Only Maps reads keywords; the others browse fixed city feeds. So the query set
 is entirely place terms — the kind of thing Maps is a directory of.
