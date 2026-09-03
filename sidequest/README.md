@@ -48,9 +48,9 @@ cp .env.example .env      # add your SOLARI_API_KEY
 npm run dashboard         # http://localhost:5173
 ```
 
-[![Sidequest — thirteen browsers planning a Tampa weekend](docs/demo-poster.jpg)](docs/demo.mp4)
+[![Sidequest — thirteen browsers planning a Tampa weekend](docs/demo-poster.jpg)](https://jjdeploy.github.io/WeekendFun/sidequest/docs/watch.html)
 
-**[▶ Watch the run (1 min)](docs/demo.mp4)** — Tampa, this weekend, typed from
+**[▶ Watch the run (1 min)](https://jjdeploy.github.io/WeekendFun/sidequest/docs/watch.html)** — Tampa, this weekend, typed from
 cold. Thirteen browsers up, 113 places read, a plan in about twenty seconds.
 The shot list it follows is in [`docs/demo-script.md`](docs/demo-script.md); the
 same city and sentence give the same plan every time, so a rehearsed take

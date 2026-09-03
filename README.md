@@ -17,14 +17,9 @@ request cannot reach: the web personalises on where your traffic comes from and
 what you have clicked before, so somebody who has just moved keeps being shown
 their old life.
 
-<!-- Clicking the thumbnail opens the mp4 on its own GitHub page, which plays
-     it. To get a player embedded directly in THIS page instead, drag
-     sidequest/docs/demo.mp4 into the GitHub web editor for this file: GitHub
-     rewrites it to a user-attachments URL that renders inline, and that link
-     can replace both of the ones below. -->
-[![Sidequest — thirteen browsers planning a Tampa weekend](sidequest/docs/demo-poster.jpg)](sidequest/docs/demo.mp4)
+[![Sidequest — thirteen browsers planning a Tampa weekend](sidequest/docs/demo-poster.jpg)](https://jjdeploy.github.io/WeekendFun/sidequest/docs/watch.html)
 
-**[▶ Watch the run (1 min)](sidequest/docs/demo.mp4)** — Tampa, this weekend,
+**[▶ Watch the run (1 min)](https://jjdeploy.github.io/WeekendFun/sidequest/docs/watch.html)** — Tampa, this weekend,
 typed from cold. Thirteen browsers up, 113 places read, a plan in about twenty
 seconds.
 

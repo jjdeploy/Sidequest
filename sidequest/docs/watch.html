@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sidequest — watch the run</title>
+<meta name="description" content="Thirteen cloud browsers, standing in one city, planning a weekend in about twenty seconds.">
+
+<!-- Open Graph, so the link previews as the video rather than as a bare URL
+     wherever it gets pasted. -->
+<meta property="og:type" content="video.other">
+<meta property="og:title" content="Sidequest — watch the run">
+<meta property="og:description" content="Thirteen cloud browsers, standing in one city, planning a weekend in about twenty seconds.">
+<meta property="og:image" content="demo-poster.jpg">
+<meta property="og:video" content="demo.mp4">
+<meta name="twitter:card" content="player">
+
+<style>
+  :root {
+    --cream: #fffaf4; --ink: #1f1712; --muted: #6b5a4e; --faint: #9a8879;
+    --coral: #f4552c; --rule: #f2e4d5;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100dvh; background: var(--cream); color: var(--ink);
+    font: 15px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: clamp(20px, 5vw, 56px);
+  }
+  header { width: 100%; max-width: 1100px; margin-bottom: 20px; }
+  h1 {
+    margin: 0 0 6px; font-family: var(--display); font-weight: 800;
+    font-size: clamp(24px, 3.4vw, 34px); letter-spacing: -0.03em;
+  }
+  h1 em { font-style: normal; color: var(--coral); }
+  p.sub { margin: 0; color: var(--muted); max-width: 62ch; }
+
+  /* The player. `controls` is the play button — the browser's own, which is
+     the one people already know how to use. */
+  video {
+    width: 100%; max-width: 1100px; height: auto; display: block;
+    border-radius: 14px; background: #0e0a08;
+    box-shadow: 0 24px 60px -24px rgba(60,25,10,.45), 0 2px 6px rgba(60,25,10,.10);
+  }
+
+  footer {
+    width: 100%; max-width: 1100px; margin-top: 20px;
+    display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: baseline;
+    font: 400 12.5px var(--mono); color: var(--faint);
+  }
+  footer a { color: var(--coral); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Sidequest — <em>watch the run</em></h1>
+  <p class="sub">
+    Tampa, this weekend, typed from cold. Thirteen browsers up, 113 places read,
+    a plan in about twenty seconds. Nothing here is staged, and the parts that
+    went badly are still in it.
+  </p>
+</header>
+
+<video controls autoplay muted playsinline preload="metadata" poster="demo-poster.jpg">
+  <source src="demo.mp4" type="video/mp4">
+  <!-- Nothing to fall back to but the file itself, which is the honest one. -->
+  Your browser will not play this inline — <a href="demo.mp4">download the mp4</a>.
+</video>
+
+<footer>
+  <span><a href="https://github.com/jjdeploy/WeekendFun">← the repo</a></span>
+  <span><a href="demo.mp4">the raw mp4</a></span>
+  <span>Built on <a href="https://getsolari.com">Solari</a> cloud browsers</span>
+</footer>
+
+</body>
+</html>
