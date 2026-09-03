@@ -48,9 +48,13 @@ cp .env.example .env      # add your SOLARI_API_KEY
 npm run dashboard         # http://localhost:5173
 ```
 
-**Demo:** [`docs/demo-script.md`](docs/demo-script.md) — a three-minute
-walkthrough with the shots in order. The same city and sentence give the same
-plan every time, so a rehearsed take matches the real one.
+[![Watch the demo](docs/demo-poster.jpg)](docs/demo.mp4)
+
+<div align="center"><sub><b>▶ One minute, end to end</b> — a request, thirteen browsers, and a weekend.</sub></div>
+
+The shot list that recording follows is in [`docs/demo-script.md`](docs/demo-script.md).
+The same city and sentence give the same plan every time, so a rehearsed take
+matches the real one.
 
 ![The landing page](docs/landing.jpg)
 

@@ -9,14 +9,29 @@
 
 ### → [**`sidequest/`**](sidequest) — the project, and the full write-up
 
+<!-- The poster is the video's own opening frame, so the click is continuous.
+
+     Clicking opens the mp4 in GitHub's viewer, which plays it. For a player
+     embedded directly in this page instead, drag docs/demo.mp4 into the
+     GitHub web editor for this file — GitHub rewrites it to a
+     user-attachments URL that renders inline, and that link can replace the
+     one below. -->
+[![Watch the demo](sidequest/docs/demo-poster.jpg)](sidequest/docs/demo.mp4)
+
+<div align="center"><sub><b>▶ One minute, end to end</b> — a request, thirteen browsers, and a weekend.</sub></div>
+
+---
+
+**[The problem](#the-problem)** · **[The solution](#the-solution)** ·
+**[How Solari is used](sidequest/README.md#how-solari-is-used)** ·
+**[Where it goes next](#where-it-goes-next)**
+
 ```bash
 cd sidequest
 npm install
 cp .env.example .env      # add your SOLARI_API_KEY
 npm run dashboard         # http://localhost:5173
 ```
-
-![The landing page](sidequest/docs/landing.jpg)
 
 <!-- Demo video: paste the link here once recorded. docs/demo-script.md has
      the shot list; the run is deterministic so a rehearsed take matches. -->
@@ -110,6 +125,39 @@ Full details, the measured dead ends, how each Solari capability is used, and
 six gotchas that each cost an afternoon:
 **[sidequest/README.md](sidequest/README.md)**.
 A three-minute demo walkthrough: **[sidequest/docs/demo-script.md](sidequest/docs/demo-script.md)**.
+
+## Where it goes next
+
+Two seams would hurt at a hundred cities, and both are visible in the code
+already.
+
+**Nothing knows what a listing *is*.** It knows what a search returned and
+what the page said. That gap is the largest single source of wrong answers
+here — a bowling *supply* shop scheduled as an afternoon out, a business
+brokerage filed under food. Most were fixed by reading the type descriptor
+Google Maps already publishes, but one cannot be fixed with a pattern at all:
+Pin Chasers is a Tampa bowling alley found by the search for bowling *and* by
+the search for arcades, and whichever browser finished first decided what it
+was. A model asked *"is this a place someone would spend a Saturday, and
+would it card a twenty-year-old?"* answers that on the first try and does not
+care which browser got home first.
+
+**And the selection itself is greedy.** Good enough for six slots out of a
+hundred candidates, and visibly not a model of taste. "A rainy Sunday with a
+seven-year-old and $60 left" is a judgement.
+
+The shape that keeps both honest is the one the deterministic version already
+argues for: **the model labels, the code decides.** One batched call attaches
+facts to candidates — what kind of place, whether it is 21+, which request it
+answers — cached against the candidate id the store already keys on, so a
+venue is labelled once ever and the same sentence still gives the same plan.
+Ranking and scheduling stay the deterministic functions they are now.
+
+It is not built, deliberately. At this size the deterministic version is more
+inspectable, cheaper, and better to demo — and the seams are marked in the
+code rather than guessed at here. The longer argument, with the run where a
+model answered the same question two different ways, is in
+[the project README](sidequest/README.md#no-agent-in-the-loop-and-where-one-would-go).
 
 ---
 
