@@ -84,7 +84,7 @@ export function cleanField(raw: string | undefined | null): string | undefined {
 
   // A bracket with nothing after it was holding up text that got truncated
   // away. "AMC Theatres(" and "Brio Italian Grille(" both reached plan cards.
-  // Only when unmatched: "Cantina Louie (Palm Coast, FL)" is the whole name.
+  // Only when unmatched: "Cantina Louie (Ormond Beach, FL)" is the whole name.
   s = s.replace(/[\s([{<]+$/, "").trim()
 
   return isDegenerate(s) ? undefined : s

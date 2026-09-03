@@ -244,11 +244,11 @@ describe("what you asked for reaches the ranking, not just the search", () => {
   })
 
   test("ask for bowling and there is bowling in the weekend", () => {
-    // The bug this exists for: "Palm Coast Lanes" is 4.0 with no review
+    // The bug this exists for: "Sunset Lanes" is 4.0 with no review
     // count, so on generic quality it loses to a 4.7-from-268-reviews park
     // every time — and should, unless somebody asked for bowling. A score
     // nudge alone can't close that gap; the itinerary reserves one slot.
-    const lanes = scored(candidate({ id: "lanes", title: "Palm Coast Lanes", category: "active" }), 5)
+    const lanes = scored(candidate({ id: "lanes", title: "Sunset Lanes", category: "active" }), 5)
     const parks = Array.from({ length: 12 }, (_, i) =>
       scored(candidate({ id: `park-${i}`, category: "outdoors", rating: 4.8, reviewCount: 4000 }), 90 - i),
     )
@@ -282,7 +282,7 @@ describe("what you asked for reaches the ranking, not just the search", () => {
 })
 
 describe("saying WHEN you want it", () => {
-  const lanes = () => scored(candidate({ id: "lanes", title: "Palm Coast Lanes", category: "active" }), 5)
+  const lanes = () => scored(candidate({ id: "lanes", title: "Sunset Lanes", category: "active" }), 5)
   // Scores in the range real ones land in: a strong venue scores around 30-45
   // (corroboration 14 + rating 8 + well-known 7), not 90. A fixture that
   // scores 90 makes the reservation look broken when it isn't.
@@ -318,7 +318,7 @@ describe("saying WHEN you want it", () => {
   })
 
   test("night still means night in a town with nothing else in it", () => {
-    // Palm Coast, verbatim. Withholding the reservation from the wrong slots
+    // a small town, verbatim. Withholding the reservation from the wrong slots
     // is not enough on its own: in a small town the requested venue is often
     // also the best thing available at ten in the morning, so it won the slot
     // on merit before the evening ever came round. The whole point of saying
@@ -664,13 +664,13 @@ describe("what you typed is a requirement, not a preference", () => {
     assert.equal(it.days[0]!.items.find((i) => i.slot === "Evening")?.scored.candidate.id, "lanes")
   })
 
-  test("Palm Coast Lanes is bowling, and does not say so", () => {
+  test("Sunset Lanes is bowling, and does not say so", () => {
     // The venue almost never repeats the search term. An alley is called
     // Lanes, an arcade is called a Retrocade, a music venue is called a
     // Hall. Matching the literal word finds Sky Lanes Bowling by luck and
     // misses every other alley in the country.
     const pinball = scored(candidate({ id: "pin", title: "Asheville Pinball Museum", category: "active" }), 30)
-    const lanes = scored(candidate({ id: "lanes", title: "Palm Coast Lanes", category: "active" }), 3)
+    const lanes = scored(candidate({ id: "lanes", title: "Sunset Lanes", category: "active" }), 3)
     const it = buildItinerary([pinball, lanes], request({ days: [WEEKEND[0]!] }), [], new Set(), "evening",
       [{ term: "bowling", category: "active" }])
     assert.equal(it.days[0]!.items.find((i) => i.slot === "Evening")?.scored.candidate.id, "lanes")

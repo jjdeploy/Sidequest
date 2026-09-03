@@ -115,12 +115,12 @@ describe("categoryFromMapsType", () => {
   test('"Coffee shop" is food, not shopping', () => {
     assert.equal(categoryFromMapsType("Coffee shop"), "food")
   })
-  test('"Bowling alley" is active — this is how Palm Coast Lanes gets categorised', () => {
+  test('"Bowling alley" is active — this is how Sunset Lanes gets categorised', () => {
     assert.equal(categoryFromMapsType("Bowling alley"), "active")
   })
   test('"Tourist attraction" resolves to nothing, so the name decides', () => {
     // Maps applies it to parks, beaches and bowling alleys alike. Treating it
-    // as a category filed six Palm Coast parks under culture.
+    // as a category filed six small-town parks under culture.
     assert.equal(categoryFromMapsType("Tourist attraction"), null)
     assert.equal(categoryFromMapsType("Tourist attraction") ?? guessCategory("Waterfront Park"), "outdoors")
   })
@@ -233,7 +233,7 @@ describe("text hygiene: what a truncated card leaves behind", () => {
   })
 
   test("...without touching a name that legitimately has brackets in it", () => {
-    assert.equal(cleanField("Cantina Louie (Palm Coast, FL)"), "Cantina Louie (Palm Coast, FL)")
+    assert.equal(cleanField("Cantina Louie (Ormond Beach, FL)"), "Cantina Louie (Ormond Beach, FL)")
     assert.equal(cleanField("The One Stop (Bar, Live Music & Kitchen)"), "The One Stop (Bar, Live Music & Kitchen)")
   })
 })
@@ -261,7 +261,7 @@ describe("milesBetween", () => {
   test("zero distance to itself", () => {
     assert.ok(milesBetween(TAMPA_PT, TAMPA_PT) < 0.001)
   })
-  test("Tampa to Palm Coast is about 150 miles", () => {
+  test("Tampa to the Atlantic coast is about 150 miles", () => {
     const miles = milesBetween(TAMPA_PT, { lat: 29.585, lng: -81.2078 })
     assert.ok(miles > 130 && miles < 170, `got ${miles}`)
   })
@@ -277,7 +277,7 @@ describe("MAPS_TYPE_PATTERN: digging the descriptor out of a result card", () =>
   const typeOf = (card: string) => card.match(new RegExp(MAPS_TYPE_PATTERN))?.[1]?.trim() ?? null
 
   test("plain two-word descriptor", () => {
-    assert.equal(typeOf("Palm Coast LanesPalm Coast Lanes 4.0Bowling alley ·  · 11 Old Kings Rd"), "Bowling alley")
+    assert.equal(typeOf("Sunset LanesSunset Lanes 4.0Bowling alley ·  · 11 Old Kings Rd"), "Bowling alley")
   })
 
   test("hyphenated descriptors are not lost", () => {
@@ -304,7 +304,7 @@ describe("MAPS_TYPE_PATTERN: digging the descriptor out of a result card", () =>
       "Tourist attraction",
     )
     assert.equal(
-      typeOf("Palm Coast LanesPalm Coast Lanes 4.0(212)Bowling alley ·  · 11 Old Kings Rd"),
+      typeOf("Sunset LanesSunset Lanes 4.0(212)Bowling alley ·  · 11 Old Kings Rd"),
       "Bowling alley",
     )
     assert.equal(

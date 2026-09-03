@@ -35,7 +35,7 @@ do, and something you are old enough to get into.
    your request          13 cloud browsers            deterministic engine
                          each proves its own
 "bowling at night"  ──▶  coordinates before   ──▶     screen · rank · book   ──▶  a weekend
-   Palm Coast, FL        it is allowed to             one gate, four checks
+   Tampa, FL             it is allowed to             one gate, four checks
                          search
 ```
 
@@ -47,6 +47,8 @@ npm install
 cp .env.example .env      # add your SOLARI_API_KEY
 npm run dashboard         # http://localhost:5173
 ```
+
+[![Sidequest — thirteen browsers planning a Tampa weekend](docs/demo-poster.jpg)](docs/demo.mp4)
 
 **[▶ Watch the run (1 min)](docs/demo.mp4)** — Tampa, this weekend, typed from
 cold. Thirteen browsers up, 113 places read, a plan in about twenty seconds.
@@ -123,7 +125,7 @@ Maps' keyword count times a navigation.
 A source can now declare `shard`, and the pool gives it one browser per
 keyword. The Starter plan allows twenty concurrent browsers; we were using six.
 
-Measured on the same Palm Coast query, before and after:
+Measured on the same small-town query, before and after:
 
 ```
 92.8s   29 candidates   1/6 sources   place: 0 confirmed / 35 unknown
@@ -231,13 +233,13 @@ to re-derive from a name what the page had already said in plain English:
 
 | In a real plan | The card said |
 |---|---|
-| "Palm Coast Lanes" stopped being bowling | `Bowling alley` |
+| a bowling alley called "<Town> Lanes" stopped being bowling | `Bowling alley` |
 | "Big Frog Custom T-Shirts" took a Saturday morning | `Custom t-shirt store` |
 | "We Sell Restaurants" was filed under food | `Business broker` |
 | a bowling **supply** shop answered a search for bowling | `Bowling supply shop` |
 | Sam's Club was filed under nightlife | `Warehouse store` |
 
-Measured on one Palm Coast run: **44 of the 48** candidates that reached
+Measured on one small-town run: **44 of the 48** candidates that reached
 ranking carried a descriptor. It is now kept on the candidate, stored, and
 consulted first by the age gate, by the booking pass, and by a new check that
 refuses an errand — somewhere you go when something needs doing, rather than
@@ -328,12 +330,13 @@ live music venues · breweries · family attractions
 ```
 
 That fallback is why a town with three bowling alleys now returns them. The old
-one was two event phrases, so Palm Coast Lanes was never a near miss — it was
-never queried.
+one was two event phrases, so a small town's only bowling alley was never a
+near miss — it was never queried.
 
 ### Intent has to reach the ranking, not just the search
 
-Typing "bowling" found Palm Coast Lanes and then left it out of the plan.
+Typing "bowling" found the one bowling alley in town and then left it out of
+the plan.
 Every part was individually right: the keyword builder searched bowling, Maps
 found the alley, the gate admitted it — and the scorer had never heard of the
 request. On generic quality a 4.0 with no review count loses to a
@@ -394,7 +397,7 @@ came back as bowling at ten in the morning a second time.
 
 ```
 Read your request as: bowling · in the evening · $300 · car
-  Evening    Palm Coast Lanes
+  Evening    <the one bowling alley in town>
 ```
 
 ### Two requests in one sentence

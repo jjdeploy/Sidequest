@@ -15,7 +15,7 @@
  * It ran every keyword sequentially in ONE browser. Every other source does
  * one or two page loads, so Maps' wall clock was its keyword count times a
  * navigation, and it set the time for the entire parallel fan-out. Measured
- * on Palm Coast: three runs, two of which spent 90 seconds here and returned
+ * on one small town: three runs, two of which spent 90 seconds here and returned
  * nothing at all. It now declares `shard`, so the pool gives it one browser
  * per keyword and they run at the same time as everything else.
  *

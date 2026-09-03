@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS signals (
 CREATE INDEX IF NOT EXISTS idx_signals_candidate ON signals(candidate_id);
 
 -- Locality name -> coordinates, so the admission gate can ask "is this
--- actually near the city" without re-geocoding "Palm Coast" every run.
+-- actually near the city" without re-geocoding "Ormond Beach" every run.
 -- Negative answers are cached too: most misses are not places at all, and
 -- re-asking about them every weekend is the expensive half.
 CREATE TABLE IF NOT EXISTS localities (

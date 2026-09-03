@@ -17,6 +17,13 @@ request cannot reach: the web personalises on where your traffic comes from and
 what you have clicked before, so somebody who has just moved keeps being shown
 their old life.
 
+<!-- Clicking the thumbnail opens the mp4 on its own GitHub page, which plays
+     it. To get a player embedded directly in THIS page instead, drag
+     sidequest/docs/demo.mp4 into the GitHub web editor for this file: GitHub
+     rewrites it to a user-attachments URL that renders inline, and that link
+     can replace both of the ones below. -->
+[![Sidequest — thirteen browsers planning a Tampa weekend](sidequest/docs/demo-poster.jpg)](sidequest/docs/demo.mp4)
+
 **[▶ Watch the run (1 min)](sidequest/docs/demo.mp4)** — Tampa, this weekend,
 typed from cold. Thirteen browsers up, 113 places read, a plan in about twenty
 seconds.
@@ -65,7 +72,7 @@ Measured, on towns of very different thickness:
 ```
 Tampa, FL        17.3s   161 listings   6/6 sources   127 admitted
 Asheville, NC    20.1s   133 listings   5/6 sources   108 admitted
-Palm Coast, FL   20.1s   124 listings   5/6 sources    57 admitted
+a small town     20.1s   124 listings   5/6 sources    57 admitted
                          the same work, one at a time: ~70s
 ```
 
@@ -109,8 +116,8 @@ to touch more of the SDK would be padding.
 ## What we would still want
 
 **Small-town coverage at volume.** The gate rejects hard on purpose, and in a
-thin town that shows: Palm Coast admits 57 of 124 where Tampa admits 127 of
-161. That is the honest number rather than a padded plan, but establishing
+thin town that shows: a small Florida town admits 57 of 124 where Tampa
+admits 127 of 161. That is the honest number rather than a padded plan, but establishing
 *which* categories thin out, and where, would take hundreds of towns — which is
 thousands of browsers.
 

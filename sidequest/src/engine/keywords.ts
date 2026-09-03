@@ -83,7 +83,7 @@ const VIBE_TERMS: Record<string, Array<[string, Category]>> = {
  * What a venue of this kind is actually called.
  *
  * A search term and a venue name are different registers. Almost no bowling
- * alley has "bowling" in its name — Palm Coast Lanes, Sky Lanes, Star Bowl,
+ * alley has "bowling" in its name — Sunset Lanes, Sky Lanes, Star Bowl,
  * AMF. An arcade is a Retrocade, a music venue is a Hall, a cinema is a
  * Cinema. Matching the literal word finds one alley by luck and misses the
  * rest of the country.
@@ -145,7 +145,7 @@ export function answersTo(term: string, title: string, kind?: string): boolean {
  * The floor: one strong Maps term per category the itinerary needs to fill.
  *
  * This is the "I'm new here and bored" query set, and it exists because the
- * old fallback was two event phrases. A Palm Coast run with no stated vibes
+ * old fallback was two event phrases. A small-town run with no stated vibes
  * searched only "things to do this weekend" and "events this weekend", so the
  * town's bowling alley was never a near miss — it was never queried.
  *
@@ -218,7 +218,7 @@ export function mentions(term: string, text: string): boolean {
  * The categories the user actually asked about.
  *
  * Search intent has to reach ranking, not just querying. Typing "bowling"
- * found Palm Coast Lanes and then ranked it below a park nobody mentioned,
+ * found Sunset Lanes and then ranked it below a park nobody mentioned,
  * because the scorer only ever saw generic quality — a 4.0 with no review
  * count loses to a 4.7 from 268 reviews every time, and should, unless
  * somebody asked for bowling.

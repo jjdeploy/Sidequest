@@ -49,7 +49,7 @@ export interface SourceTask {
    * per keyword, in sequence, in a single browser. That made it the long pole
    * by construction: every other source does one or two page loads, so the
    * fan-out's wall clock was Maps' keyword count times a page load, and a
-   * Palm Coast run spent 90 seconds there and returned nothing.
+   * small-town run spent 90 seconds there and returned nothing.
    *
    * The Starter plan allows twenty concurrent browsers and we were using six.
    * A task that returns shards here gets one browser per shard, each with its

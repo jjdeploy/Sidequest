@@ -16,7 +16,7 @@ describe("parseEventWhen: the formats these sites actually publish", () => {
   const cases: Array<[string, string | null]> = [
     ["Sat, Sep 19 - 4th Annual Food & Wine Classic at Hammock Beach", "2026-09-19"],
     ["Featured Sat, 19 Sep, 2026 - 05:00 PM 4th Annual Food & Wine Classic", "2026-09-19"],
-    ["Thu, 24 Sep • 06:00 PM Beats and Eats Palm Coast 118+ Interested", "2026-09-24"],
+    ["Thu, 24 Sep • 06:00 PM Beats and Eats Riverside 118+ Interested", "2026-09-24"],
     ["Featured Fri, 09 Oct, 2026 - 12:00 AM Constellation FURYK & FRIENDS", "2026-10-09"],
     ["Sat, 05 Sep, 2026 - 12:00 PM", "2026-09-05"],
     ["Sun, 06 Sep • 11:00 AM", "2026-09-06"],

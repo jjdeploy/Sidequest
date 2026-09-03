@@ -133,7 +133,7 @@ export function buildItinerary(
    *
    * If someone types "bowling", there should be bowling in their weekend.
    * A score bonus alone can't promise that: an explicitly requested venue is
-   * often a thin one — Palm Coast Lanes is 4.0 with no review count — and it
+   * often a thin one — Sunset Lanes is 4.0 with no review count — and it
    * will lose to a well-reviewed park that nobody mentioned however much you
    * nudge it. So the FIRST candidate of each requested category gets a large
    * one-time preference, and the category drops out as soon as it's placed.
@@ -276,7 +276,7 @@ export function buildItinerary(
        *
        * "Lanes" is in Memory Lane Antiques and "hall" is in City Hall, so an
        * alias on its own proves very little. An alias plus the category the
-       * request was for is Palm Coast Lanes. The bottom tier still exists
+       * request was for is Sunset Lanes. The bottom tier still exists
        * because a bowling alley Maps forgot to type comes back as `other`,
        * and it is still the bowling alley.
        */

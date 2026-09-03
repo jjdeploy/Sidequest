@@ -11,8 +11,9 @@ npm run dashboard          # http://localhost:5173
 ```
 
 - Browser at **1440×900**, bookmarks bar hidden, zoom 100%.
-- Use **Palm Coast, FL**. It is a thin town, which is the harder and more
-  honest demo: a dense city hides a bad planner behind good inventory.
+- Use a **small town** rather than a big one. It is the harder and more honest
+  demo: a dense city hides a bad planner behind good inventory. Pick one you do
+  not mind naming on camera.
 - Have a second tab on the repo's README if you want to cut to the diagram.
 - One run takes ~25s wall clock. Don't cut it — the wait *is* the product.
 
@@ -22,13 +23,13 @@ npm run dashboard          # http://localhost:5173
 
 Landing page, don't touch anything yet.
 
-> "It's Friday. You just moved to Palm Coast and you have no idea what's on
+> "It's Friday. You just moved here and you have no idea what's on
 > this weekend. That's spread across a dozen sites and not one of them will
 > sell you an API — which is why nobody has solved this."
 
 **2 · Ask for something specific (0:15–0:30)**
 
-Type `Palm Coast, FL`. Open the weekend popover, pick a weekend. In the free
+Type the town. Open the weekend popover, pick a weekend. In the free
 text box type `bowling at night`.
 
 > "I'm not going to ask for 'things to do'. I'm going to ask for something
@@ -42,7 +43,7 @@ Let the ring fill. Point at the pips landing one by one, and the line under
 them.
 
 > "Thirteen real browsers, launched in the cloud, all at once. Each one is
-> standing at Palm Coast's coordinates — and none of them is allowed to search
+> standing at the town's coordinates — and none of them is allowed to search
 > until the page it opened confirms those coordinates back. That's the gate."
 
 Read the counter out loud as it climbs. Land on:
@@ -102,7 +103,7 @@ Back to the landing page, flip **21+**, note the caption changing.
   residential tunnel died and it fell back to direct egress. The geolocation
   override is what localises, not the proxy — that's the finding worth saying
   out loud.
-- **A plan looks thin.** Palm Coast genuinely is thin. Say the number of
+- **A plan looks thin.** A small town genuinely is thin. Say the number of
   candidates that survived screening rather than pretending.
 
 ## Retaking the screenshots

@@ -146,7 +146,7 @@ export function guessCategory(text: string, fallback: Category = "other"): Categ
  * would be a treadmill.
  *
  * Two of these reached real plans. "Big Frog Custom T-Shirts & More" took a
- * Saturday morning in Palm Coast, and "Slingin' Wood Pro Shop" — a bowling
+ * Saturday morning in a small town, and "Slingin' Wood Pro Shop" — a bowling
  * SUPPLY retailer — took an Asheville afternoon because the search for
  * bowling found it. Maps had labelled both correctly on the card and nobody
  * read the label.
@@ -292,7 +292,7 @@ export function categoryFromMapsType(raw: string): Category | null {
     //
     // "tourist attraction" is deliberately absent. Maps applies it to
     // parks, beaches and bowling alleys alike — it is a search-result
-    // label, not a type — and matching it filed six Palm Coast parks
+    // label, not a type — and matching it filed six small-town parks
     // under culture. Falling through to the name gets "Waterfront Park"
     // right.
     [/\b(museums?|galler(?:y|ies)|historical?|landmarks?|monuments?)\b|观光/, "culture"],

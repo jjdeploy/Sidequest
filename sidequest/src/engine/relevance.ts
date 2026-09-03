@@ -9,7 +9,7 @@
  * produced something plausible and nobody checked:
  *
  *   a September 19th festival planned for the 5th   (nobody checked the date)
- *   a Palm Coast concert in a Tampa weekend         (nobody checked the place)
+ *   a concert 90 miles away in a Tampa weekend         (nobody checked the place)
  *   "earn CE credits" as a Saturday night out       (only two sources checked)
  *   "&amp; Ho... Read more" stored as an address    (nobody checked the text)
  *
@@ -22,7 +22,7 @@
  * Three rules the checks obey:
  *
  *  1. **Unknown is not a failure.** 70% of candidates carry no coordinates at
- *     all. Treating "we can't tell" as "it's fine" is how Palm Coast got in;
+ *     all. Treating "we can't tell" as "it's fine" is how out-of-town results got in;
  *     treating it as "it's wrong" would throw away most of the plan. It gets
  *     its own state and it gets counted, so the gaps are visible.
  *
@@ -212,7 +212,7 @@ function checkKind(c: Candidate): Finding {
 
   // The source said what it is, and what it is is an errand.
   //
-  // "Big Frog Custom T-Shirts & More" took a Saturday morning in Palm Coast
+  // "Big Frog Custom T-Shirts & More" took a Saturday morning in a small town
   // and "Slingin' Wood Pro Shop" — a bowling SUPPLY retailer — took an
   // Asheville afternoon, both because a search found them and nothing ever
   // asked what they were. Maps had written it on the card.

@@ -1,5 +1,5 @@
 /**
- * "Is "Palm Coast" near Tampa?" — asked once, ever.
+ * "Is "Ormond Beach" near Tampa?" — asked once, ever.
  *
  * The admission gate needs to turn a place name it found in a listing into
  * coordinates. That is a network call, and the same handful of names recur

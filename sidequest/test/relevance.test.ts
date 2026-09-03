@@ -172,7 +172,7 @@ describe("the summary is what makes the gaps visible", () => {
 
 describe("kind: an errand is not an outing", () => {
   // Two of these reached real plans. "Big Frog Custom T-Shirts & More" took
-  // a Saturday morning in Palm Coast; "Slingin' Wood Pro Shop" — a bowling
+  // a Saturday morning in a small town; "Slingin' Wood Pro Shop" — a bowling
   // SUPPLY retailer — took an afternoon in Asheville when the search for
   // bowling found it. Maps labelled both correctly on the card.
   const judgeKind = async (c) => {
@@ -189,7 +189,7 @@ describe("kind: an errand is not an outing", () => {
     })
   }
 
-  // Verbatim from one Palm Coast run: Maps published a descriptor on 44 of
+  // Verbatim from one small-town run: Maps published a descriptor on 44 of
   // the 48 candidates that survived to ranking. Two of these had been in a
   // real plan — "We Sell Restaurants", a business brokerage, took a Sunday
   // morning, and a bowling supply shop was found by the search for bowling.

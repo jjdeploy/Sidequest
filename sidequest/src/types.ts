@@ -120,7 +120,7 @@ export interface Candidate {
    * but where it exists it is the single most reliable fact about a listing,
    * because it is the site's own claim rather than our inference from a
    * name. It used to be read, mapped down to one of eleven coarse categories
-   * and thrown away, which is why "Palm Coast Lanes" stopped being a bowling
+   * and thrown away, which is why "Sunset Lanes" stopped being a bowling
    * alley and Sam's Club became nightlife.
    */
   kind?: string
