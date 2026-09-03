@@ -48,17 +48,11 @@ cp .env.example .env      # add your SOLARI_API_KEY
 npm run dashboard         # http://localhost:5173
 ```
 
-[![Watch the demo](docs/demo-poster.jpg)](docs/demo.mp4)
-
-<div align="center"><sub><b>▶ One minute, end to end</b> — a request, thirteen browsers, and a weekend.</sub></div>
-
-The shot list that recording follows is in [`docs/demo-script.md`](docs/demo-script.md).
-The same city and sentence give the same plan every time, so a rehearsed take
+**[▶ Watch the run (1 min)](docs/demo.mp4)** — Tampa, this weekend, typed from
+cold. Thirteen browsers up, 113 places read, a plan in about twenty seconds.
+The shot list it follows is in [`docs/demo-script.md`](docs/demo-script.md); the
+same city and sentence give the same plan every time, so a rehearsed take
 matches the real one.
-
-<!-- Demo video: paste the link here once recorded. docs/demo-script.md has
-     the shot list; the run is deterministic so a rehearsed take matches. -->
-**▶ [Three-minute demo](#)** — *link to be added*
 
 ## How Solari is used
 

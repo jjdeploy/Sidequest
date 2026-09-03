@@ -17,8 +17,6 @@ request cannot reach: the web personalises on where your traffic comes from and
 what you have clicked before, so somebody who has just moved keeps being shown
 their old life.
 
-[![Sidequest — click to watch thirteen browsers plan a Tampa weekend](sidequest/docs/demo-poster.jpg)](sidequest/docs/demo.mp4)
-
 **[▶ Watch the run (1 min)](sidequest/docs/demo.mp4)** — Tampa, this weekend,
 typed from cold. Thirteen browsers up, 113 places read, a plan in about twenty
 seconds.
